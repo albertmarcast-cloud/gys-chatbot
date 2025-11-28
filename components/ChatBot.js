@@ -115,7 +115,7 @@ export default function ChatBot() {
       PRECIO_APLICADO: precio,
       DESCUENTO_POR_CANTIDAD: 0,
       SUBTOTAL_ITEM: precio * cantidad,
-      FOTO: currentProduct["FOTO LINK"] || currentProduct.FOTO || currentProduct["FOTO  PRODUCTO"] || ""
+      FOTO: currentProduct.FOTO || ""
     };
 
     setSessionData(prev => ({
@@ -481,7 +481,7 @@ export default function ChatBot() {
             ) : currentProduct ? (
               <div className="relative">
                 <img 
-                  src={currentProduct.FOTO || 'https://via.placeholder.com/300'}
+                  src={currentProduct.FOTO || currentProduct["FOTO LINK"] || 'https://via.placeholder.com/300'}
                   alt={currentProduct.DESCRIPCION}
                   className="w-full h-64 object-cover rounded-lg mb-3"
                   onError={(e) => e.target.src = 'https://via.placeholder.com/300?text=Sin+Imagen'}
