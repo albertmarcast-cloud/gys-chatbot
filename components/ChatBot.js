@@ -485,7 +485,11 @@ export default function ChatBot() {
                    console.log('🔍 DEBUG currentProduct:', currentProduct);
                    console.log('🔍 FOTO:', currentProduct?.FOTO);
                    console.log('🔍 FOTO LINK:', currentProduct?.["FOTO LINK"]);
-                  const url = currentProduct?.FOTO || currentProduct?.["FOTO LINK"] || 'https://via.placeholder.com/300';
+                  let url = currentProduct?.FOTO || currentProduct?.["FOTO LINK"] || 'https://via.placeholder.com/300';
+                  if (url.includes('drive.google.com/uc?export=view')) {
+                  const id = url.split('id=')[1];
+                  url = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
+                  }
                   console.log('🔍 URL final:', url);
                   return url;
                     })()}
