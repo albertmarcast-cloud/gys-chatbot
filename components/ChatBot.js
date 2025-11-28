@@ -115,7 +115,7 @@ export default function ChatBot() {
       PRECIO_APLICADO: precio,
       DESCUENTO_POR_CANTIDAD: 0,
       SUBTOTAL_ITEM: precio * cantidad,
-      FOTO: currentProduct["FOTO_LINK"] || currentProduct.FOTO || currentProduct["FOTO  PRODUCTO"] || ""
+      FOTO: currentProduct["FOTO LINK"] || currentProduct.FOTO || currentProduct["FOTO  PRODUCTO"] || ""
     };
 
     setSessionData(prev => ({
