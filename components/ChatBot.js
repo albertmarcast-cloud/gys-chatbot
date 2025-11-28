@@ -481,7 +481,14 @@ export default function ChatBot() {
             ) : currentProduct ? (
               <div className="relative">
                 <img 
-                  src={currentProduct.FOTO || currentProduct["FOTO LINK"] || 'https://via.placeholder.com/300'}
+                  src={(() => {
+                   console.log('🔍 DEBUG currentProduct:', currentProduct);
+                   console.log('🔍 FOTO:', currentProduct?.FOTO);
+                   console.log('🔍 FOTO LINK:', currentProduct?.["FOTO LINK"]);
+                  const url = currentProduct?.FOTO || currentProduct?.["FOTO LINK"] || 'https://via.placeholder.com/300';
+                  console.log('🔍 URL final:', url);
+                  return url;
+                    })()}
                   alt={currentProduct.DESCRIPCION}
                   className="w-full h-64 object-cover rounded-lg mb-3"
                   onError={(e) => e.target.src = 'https://via.placeholder.com/300?text=Sin+Imagen'}
