@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, ShoppingBag, Package, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOHi4qZyxwvdGy826isCABC7JQqeEGvZ8kFT9FzbVi_s5NYKFkHZFVrtoQB6r9NpM/exec";
+const SCRIPT_URL = "/api/sheets";
 const WHATSAPP_NEGOCIO = "50375936319";
 
 export default function ChatBot() {
