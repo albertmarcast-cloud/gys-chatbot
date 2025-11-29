@@ -167,6 +167,7 @@ export default function ChatBot() {
     const total = subtotal + sessionData.costo_envio;
 
     const pedido = {
+      route: 'crearPedido',
       telefono: sessionData.telefono,
       nombre: sessionData.nombre,
       municipio: sessionData.municipio,
