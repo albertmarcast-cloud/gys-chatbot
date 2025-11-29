@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, ShoppingBag, Package, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Send, ShoppingBag, Package, ChevronLeft, ChevronRight, Loader2, Truck, MapPin } from 'lucide-react';
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOHi4qZyxwvdGy826isCABC7JQqeEGvZ8kFT9FzbVi_s5NYKFkHZFVrtoQB6r9NpM/exec";
 const WHATSAPP_NEGOCIO = "50375936319";
@@ -8,7 +8,9 @@ export default function ChatBot() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [catalogo, setCatalogo] = useState([]);
+  const [encomiendistas, setEncomiendistas] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [loadingEncomiendas, setLoadingEncomiendas] = useState(false);
   const [sessionData, setSessionData] = useState({
     step: 'inicio',
     nombre: '',
@@ -20,7 +22,11 @@ export default function ChatBot() {
     tipo_entrega: '',
     metodo_pago: '',
     encomiendista: '',
-    costo_envio: 0
+    encomiendista_nombre: '',
+    encomiendista_telefono: '',
+    costo_envio: 0,
+    dia_entrega: '',
+    hora_entrega: ''
   });
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [showCarousel, setShowCarousel] = useState(false);
@@ -72,6 +78,64 @@ export default function ChatBot() {
       setCatalogo([]);
     }
     setLoadingCatalog(false);
+  };
+
+  // 🆕 NUEVA FUNCIÓN: Cargar encomiendistas por municipio
+  const cargarEncomiendistas = async (municipio) => {
+    setLoadingEncomiendas(true);
+    try {
+      const url = `${SCRIPT_URL}?route=encomiendas&municipio=${encodeURIComponent(municipio)}&tipo_entrega=domicilio`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.error) {
+        addMessage("❌ Error al buscar encomiendistas. Intenta de nuevo.", 'bot');
+        setEncomiendistas([]);
+        return false;
+      } else {
+        const items = data.items || [];
+        setEncomiendistas(items);
+        
+        if (items.length === 0) {
+          addMessage(`⚠️ Lo siento, no tenemos cobertura de envío en ${municipio} por el momento.\n\n¿Deseas retirar en tienda?`, 'bot', [
+            { label: "🏪 Sí, retiro en tienda", value: "retiro" },
+            { label: "📍 Cambiar municipio", value: "cambiar_municipio" }
+          ]);
+          return false;
+        }
+        
+        return true;
+      }
+    } catch (error) {
+      addMessage("❌ Error de conexión. Verifica tu internet.", 'bot');
+      setEncomiendistas([]);
+      return false;
+    } finally {
+      setLoadingEncomiendas(false);
+    }
+  };
+
+  // 🆕 NUEVA FUNCIÓN: Mostrar opciones de encomiendistas
+  const mostrarEncomiendistas = () => {
+    if (encomiendistas.length === 0) return;
+
+    let mensaje = `📦 *Opciones de envío para ${sessionData.municipio}:*\n\n`;
+    
+    const opciones = encomiendistas.slice(0, 5).map((enc, idx) => {
+      const num = idx + 1;
+      mensaje += `${num}. 🚚 *${enc.ENCOMIENDISTA}*\n`;
+      mensaje += `   💵 Costo: $${enc.COSTO_ENVIO}\n`;
+      mensaje += `   📅 Entrega: ${enc.DIA_ENTREGA || 'Por confirmar'}\n`;
+      mensaje += `   ⏰ Horario: ${enc.HORA_ENTREGA || 'Por confirmar'}\n\n`;
+      
+      return {
+        label: `${num}. ${enc.ENCOMIENDISTA} - $${enc.COSTO_ENVIO}`,
+        value: `encomiendista_${idx}`
+      };
+    });
+
+    addMessage(mensaje, 'bot', opciones);
   };
 
   const getFilteredCatalog = () => {
@@ -167,7 +231,6 @@ export default function ChatBot() {
     const total = subtotal + sessionData.costo_envio;
 
     const pedido = {
-      
       telefono: sessionData.telefono,
       nombre: sessionData.nombre,
       municipio: sessionData.municipio,
@@ -184,13 +247,20 @@ export default function ChatBot() {
     };
 
     try {
-      const response = await fetch('/api/sheets', {
+      const response = await fetch(`${SCRIPT_URL}?route=crearPedido`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(pedido)
       });
 
-      addMessage(`✅ ¡Pedido enviado exitosamente!`, 'bot');
+      const data = await response.json();
+      
+      if (data.success) {
+        addMessage(`✅ ¡Pedido #${data.factura} creado exitosamente!`, 'bot');
+      } else {
+        addMessage("⚠️ Hubo un problema al guardar. Enviando por WhatsApp...", 'bot');
+      }
+      
       enviarWhatsApp(subtotal, total);
     } catch (error) {
       addMessage("⚠️ Enviando pedido por WhatsApp...", 'bot');
@@ -218,6 +288,10 @@ export default function ChatBot() {
       mensaje += `📍 ${sessionData.municipio}\n`;
       mensaje += `🏠 ${sessionData.direccion}\n`;
       mensaje += `📌 ${sessionData.punto_referencia}\n`;
+      mensaje += `🚛 Encomienda: ${sessionData.encomiendista_nombre}\n`;
+      if (sessionData.dia_entrega) {
+        mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+      }
     }
     mensaje += `💳 *Pago:* ${sessionData.metodo_pago}\n\n`;
     mensaje += `✨ _Pedido desde chatbot automático_`;
@@ -230,7 +304,7 @@ export default function ChatBot() {
     }, 1000);
   };
 
-  const processMessage = (userInput) => {
+  const processMessage = async (userInput) => {
     addMessage(userInput, 'user');
     
     const input = userInput.toLowerCase().trim();
@@ -323,9 +397,46 @@ export default function ChatBot() {
       return;
     }
 
+    // 🆕 PASO: Después del municipio, buscar encomiendistas
     if (session.step === 'municipio') {
-      setSessionData(prev => ({ ...prev, municipio: userInput.trim(), step: 'direccion' }));
-      addMessage(`Entendido, ${userInput.trim()} 📍\n\n¿Cuál es tu dirección completa?`, 'bot');
+      setSessionData(prev => ({ ...prev, municipio: userInput.trim(), step: 'buscando_encomiendistas' }));
+      addMessage(`Buscando opciones de envío en ${userInput.trim()}... 🔍`, 'bot');
+      
+      const hayEncomiendas = await cargarEncomiendistas(userInput.trim());
+      
+      if (hayEncomiendas) {
+        setSessionData(prev => ({ ...prev, step: 'seleccionar_encomiendista' }));
+        mostrarEncomiendistas();
+      }
+      return;
+    }
+
+    // 🆕 PASO: Cambiar municipio si no hay cobertura
+    if (input === 'cambiar_municipio') {
+      setSessionData(prev => ({ ...prev, step: 'municipio' }));
+      addMessage("¿En qué municipio te encuentras?", 'bot');
+      return;
+    }
+
+    // 🆕 PASO: Selección de encomiendista
+    if (session.step === 'seleccionar_encomiendista' && input.startsWith('encomiendista_')) {
+      const idx = parseInt(input.split('_')[1]);
+      const encomiendista = encomiendistas[idx];
+      
+      if (encomiendista) {
+        setSessionData(prev => ({ 
+          ...prev, 
+          encomiendista: encomiendista.ID_ENCOMENDISTA,
+          encomiendista_nombre: encomiendista.ENCOMIENDISTA,
+          encomiendista_telefono: encomiendista.TELEFONO_ENCOMIENDISTA,
+          costo_envio: encomiendista.COSTO_ENVIO,
+          dia_entrega: encomiendista.DIA_ENTREGA || '',
+          hora_entrega: encomiendista.HORA_ENTREGA || '',
+          step: 'direccion'
+        }));
+        
+        addMessage(`✅ Encomienda seleccionada: ${encomiendista.ENCOMIENDISTA}\n💵 Costo: $${encomiendista.COSTO_ENVIO}\n\n¿Cuál es tu dirección completa?`, 'bot');
+      }
       return;
     }
 
@@ -339,10 +450,9 @@ export default function ChatBot() {
       setSessionData(prev => ({ 
         ...prev, 
         punto_referencia: userInput.trim(),
-        costo_envio: 3.50,
         step: 'metodo_pago'
       }));
-      addMessage("Gracias 📌\n\nCosto de envío: $3.50\n\n¿Cómo deseas pagar?", 'bot', [
+      addMessage(`Gracias 📌\n\n¿Cómo deseas pagar?`, 'bot', [
         { label: "💵 Contra entrega", value: "contra_entrega" },
         { label: "💳 Transferencia", value: "transferencia" }
       ]);
@@ -389,6 +499,10 @@ export default function ChatBot() {
     resumen += `🚚 ${sessionData.tipo_entrega}\n`;
     if (sessionData.tipo_entrega !== 'TIENDA') {
       resumen += `📍 ${sessionData.municipio}\n${sessionData.direccion}\n`;
+      resumen += `🚛 ${sessionData.encomiendista_nombre}\n`;
+      if (sessionData.dia_entrega) {
+        resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+      }
     }
     resumen += `💳 ${sessionData.metodo_pago}\n\n`;
     resumen += `¿Todo correcto?`;
@@ -453,6 +567,15 @@ export default function ChatBot() {
             </div>
           </div>
         ))}
+
+        {loadingEncomiendas && (
+          <div className="flex justify-center items-center">
+            <div className="bg-white rounded-xl shadow-lg p-6 flex items-center gap-3">
+              <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+              <span className="text-gray-700">Buscando opciones de envío...</span>
+            </div>
+          </div>
+        )}
         
         {showCarousel && (
           <div className="bg-white rounded-xl shadow-lg p-4 mx-auto max-w-md">
@@ -482,17 +605,13 @@ export default function ChatBot() {
               <div className="relative">
                 <img 
                   src={(() => {
-                   console.log('🔍 DEBUG currentProduct:', currentProduct);
-                   console.log('🔍 FOTO:', currentProduct?.FOTO);
-                   console.log('🔍 FOTO LINK:', currentProduct?.["FOTO LINK"]);
-                  let url = currentProduct?.FOTO || currentProduct?.["FOTO LINK"] || 'https://via.placeholder.com/300';
-                  if (url.includes('drive.google.com/uc?export=view')) {
-                  const id = url.split('id=')[1];
-                  url = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
-                  }
-                  console.log('🔍 URL final:', url);
-                  return url;
-                    })()}
+                    let url = currentProduct?.FOTO || currentProduct?.["FOTO LINK"] || 'https://via.placeholder.com/300';
+                    if (url.includes('drive.google.com/uc?export=view')) {
+                      const id = url.split('id=')[1];
+                      url = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
+                    }
+                    return url;
+                  })()}
                   alt={currentProduct.DESCRIPCION}
                   className="w-full h-64 object-cover rounded-lg mb-3"
                   onError={(e) => e.target.src = 'https://via.placeholder.com/300?text=Sin+Imagen'}
