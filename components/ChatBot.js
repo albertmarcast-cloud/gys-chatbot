@@ -513,8 +513,26 @@ export default function ChatBot() {
 
     // Departamento PERSONALIZADO
     if (input.startsWith('dep_pers_')) {
-      const departamento = input.replace('dep_pers_', '');
+      const departamentoInput = input.replace('dep_pers_', '');
+      
+      // Buscar el departamento de forma case-insensitive
+      const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
+        key => key.toLowerCase() === departamentoInput.toLowerCase()
+      );
+      
+      const departamento = departamentoKey || departamentoInput;
       const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
+      
+      console.log('🔍 Input:', departamentoInput);
+      console.log('🔍 Key encontrada:', departamentoKey);
+      console.log('📍 Municipios:', municipios.length);
+      
+      if (municipios.length === 0) {
+        addMessage(`⚠️ No se encontraron municipios para ${departamentoInput}. Por favor contacta con un agente.`, 'bot', [
+          { label: "📞 Contactar agente", value: "agente" }
+        ]);
+        return;
+      }
       
       setSessionData(prev => ({ ...prev, departamento: departamento, step: 'municipio_personalizado' }));
       addMessage(`${departamento} 📍\n\n¿De qué municipio?`, 'bot',
