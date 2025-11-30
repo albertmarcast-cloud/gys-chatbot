@@ -423,11 +423,10 @@ export default function ChatBot() {
       const totalProductos = session.carrito.reduce((sum, item) => sum + item.CANTIDAD, 0);
 
       if (totalProductos >= 3) {
-        // 3+ productos: PERSONALIZADO, PUNTO FIJO no disponible, CASILLERO
+        // 3+ productos: Solo PERSONALIZADO y CASILLERO (sin PUNTO FIJO)
         setSessionData(prev => ({ ...prev, step: 'tipo_envio_3mas' }));
         addMessage("📦 Tienes 3 o más productos\n\n¿Cómo deseas recibir tu pedido?", 'bot', [
           { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
-          { label: "📍 PUNTO FIJO", value: "tipo_punto_fijo_3mas" },
           { label: "📦 CASILLERO", value: "tipo_casillero" }
         ]);
       } else {
@@ -439,15 +438,6 @@ export default function ChatBot() {
           { label: "📦 CASILLERO", value: "tipo_casillero" }
         ]);
       }
-      return;
-    }
-
-    // PUNTO FIJO no disponible para 3+ productos
-    if (input === 'tipo_punto_fijo_3mas') {
-      addMessage("⚠️ PUNTO FIJO no está disponible para pedidos de 3 o más productos.\n\nPor favor elige otra opción:", 'bot', [
-        { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
-        { label: "📦 CASILLERO", value: "tipo_casillero" }
-      ]);
       return;
     }
 
