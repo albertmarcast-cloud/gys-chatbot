@@ -100,47 +100,6 @@ export default function ChatBot() {
     setLoadingCatalog(false);
   };
 
-  // 🆕 Obtener tipos de envío únicos disponibles
-  const obtenerTiposEnvio = async () => {
-    setLoadingEncomiendas(true);
-    try {
-      const url = `${SCRIPT_URL}?route=encomiendas`;
-      const response = await fetch(url);
-      const data = await response.json();
-      
-      if (!data.error && data.items) {
-        // Extraer tipos únicos
-        const tiposSet = new Set();
-        data.items.forEach(enc => {
-          const tipos = (enc.TIPOS_DE_ENVIO_DISPONIBLES || '').split(',');
-          tipos.forEach(tipo => {
-            const tipoLimpio = tipo.trim().toUpperCase();
-            if (tipoLimpio) tiposSet.add(tipoLimpio);
-          });
-        });
-        
-        const tiposArray = Array.from(tiposSet);
-        setTiposEnvioDisponibles(tiposArray);
-        
-        if (tiposArray.length > 0) {
-          addMessage("📦 Selecciona el tipo de envío:", 'bot', 
-            tiposArray.map(tipo => ({
-              label: `${tipo === 'PERSONALIZADO' ? '🏠' : tipo === 'PUNTO FIJO' ? '📍' : '🚚'} ${tipo}`,
-              value: `tipo_${tipo}`
-            }))
-          );
-        } else {
-          addMessage("⚠️ No hay opciones de envío disponibles. Contacta con un agente.", 'bot', [
-            { label: "📞 Contactar agente", value: "agente" }
-          ]);
-        }
-      }
-    } catch (error) {
-      addMessage("❌ Error al cargar opciones de envío.", 'bot');
-    }
-    setLoadingEncomiendas(false);
-  };
-
   const cargarEncomiendistas = async (departamento, municipio, tipoEnvio) => {
     setLoadingEncomiendas(true);
     try {
@@ -323,23 +282,46 @@ export default function ChatBot() {
     });
     
     mensaje += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
-    mensaje += `🚚 Envío (${sessionData.tipo_entrega}): $${sessionData.costo_envio.toFixed(2)}\n`;
+    
+    // Tipo de envío con emoji
+    let tipoTexto = sessionData.tipo_entrega;
+    if (sessionData.tipo_entrega === 'PERSONALIZADO') tipoTexto = '🏠 PERSONALIZADO';
+    else if (sessionData.tipo_entrega === 'PUNTO FIJO') tipoTexto = '📍 PUNTO FIJO';
+    else if (sessionData.tipo_entrega === 'CASILLERO') tipoTexto = '📦 CASILLERO';
+    
+    mensaje += `🚚 Envío (${tipoTexto}): $${sessionData.costo_envio.toFixed(2)}\n`;
     mensaje += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
     
     mensaje += `📍 *UBICACIÓN:*\n`;
     mensaje += `${sessionData.departamento} - ${sessionData.municipio}\n`;
     
-    if (sessionData.direccion) {
-      mensaje += `🏠 ${sessionData.direccion}\n`;
-    }
-    if (sessionData.punto_referencia) {
-      mensaje += `📌 ${sessionData.punto_referencia}\n`;
-    }
-    if (sessionData.encomiendista_nombre) {
-      mensaje += `🚛 ${sessionData.encomiendista_nombre}\n`;
-    }
-    if (sessionData.dia_entrega) {
-      mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+    if (sessionData.tipo_entrega === 'PERSONALIZADO') {
+      mensaje += `\n🏠 *ENVÍO PERSONALIZADO*\n`;
+      if (sessionData.punto_referencia) {
+        mensaje += `📌 Punto de referencia: ${sessionData.punto_referencia}\n`;
+      }
+    } else if (sessionData.tipo_entrega === 'PUNTO FIJO') {
+      mensaje += `\n📍 *PUNTO FIJO*\n`;
+      if (sessionData.encomiendista_nombre) {
+        mensaje += `🚛 ${sessionData.encomiendista_nombre}\n`;
+      }
+      if (sessionData.punto_referencia) {
+        mensaje += `📍 Punto: ${sessionData.punto_referencia}\n`;
+      }
+      if (sessionData.dia_entrega) {
+        mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+      }
+    } else if (sessionData.tipo_entrega === 'CASILLERO') {
+      mensaje += `\n📦 *CASILLERO*\n`;
+      if (sessionData.encomiendista_nombre) {
+        mensaje += `📦 ${sessionData.encomiendista_nombre}\n`;
+      }
+      if (sessionData.punto_referencia) {
+        mensaje += `📍 Ubicación: ${sessionData.punto_referencia}\n`;
+      }
+      if (sessionData.dia_entrega) {
+        mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+      }
     }
     
     mensaje += `\n💳 *Pago:* ${sessionData.metodo_pago}\n\n`;
@@ -422,109 +404,302 @@ export default function ChatBot() {
       const totalProductos = session.carrito.reduce((sum, item) => sum + item.CANTIDAD, 0);
 
       if (totalProductos >= 3) {
-        // 3+ productos: Solo PERSONALIZADO - Costo fijo $3.50
-        setSessionData(prev => ({ 
-          ...prev, 
-          tipo_entrega: 'PERSONALIZADO',
-          costo_envio: 3.50,
-          step: 'departamento_directo' 
-        }));
-        
-        addMessage("📦 Tienes 3 o más productos\n🚚 Envío PERSONALIZADO - $3.50\n\n📍 ¿De qué departamento eres?", 'bot', 
-          Object.keys(DEPARTAMENTOS_MUNICIPIOS).map(dep => ({
-            label: dep,
-            value: `dep_directo_${dep}`
-          }))
-        );
+        // 3+ productos: PERSONALIZADO, PUNTO FIJO no disponible, CASILLERO
+        setSessionData(prev => ({ ...prev, step: 'tipo_envio_3mas' }));
+        addMessage("📦 Tienes 3 o más productos\n\n¿Cómo deseas recibir tu pedido?", 'bot', [
+          { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
+          { label: "📍 PUNTO FIJO", value: "tipo_punto_fijo_3mas" },
+          { label: "📦 CASILLERO", value: "tipo_casillero" }
+        ]);
       } else {
-        // 1-2 productos: Mostrar tipos disponibles
+        // 1-2 productos: 3 opciones disponibles
         setSessionData(prev => ({ ...prev, step: 'tipo_envio' }));
-        addMessage("Buscando opciones de envío disponibles... 🔍", 'bot');
-        await obtenerTiposEnvio();
-      }
-      return;
-    }
-
-    // Seleccionar tipo de envío (1-2 productos)
-    if (input.startsWith('tipo_')) {
-      const tipo = input.replace('tipo_', '');
-      setSessionData(prev => ({ ...prev, tipo_entrega: tipo, step: 'departamento' }));
-      
-      addMessage(`✅ Seleccionaste: ${tipo}\n\n📍 ¿De qué departamento eres?`, 'bot',
-        Object.keys(DEPARTAMENTOS_MUNICIPIOS).map(dep => ({
-          label: dep,
-          value: `dep_${dep}`
-        }))
-      );
-      return;
-    }
-
-    // Departamento (flujo normal 1-2 productos)
-    if (input.startsWith('dep_') && !input.startsWith('dep_directo_')) {
-      const departamento = input.replace('dep_', '');
-      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
-      
-      setSessionData(prev => ({ ...prev, departamento: departamento, step: 'municipio' }));
-      addMessage(`${departamento} 📍\n\n¿De qué municipio?`, 'bot',
-        municipios.map(muni => ({
-          label: muni,
-          value: `muni_${muni}`
-        }))
-      );
-      return;
-    }
-
-    // Departamento (flujo directo 3+ productos)
-    if (input.startsWith('dep_directo_')) {
-      const departamento = input.replace('dep_directo_', '');
-      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
-      
-      setSessionData(prev => ({ ...prev, departamento: departamento, step: 'municipio_directo' }));
-      addMessage(`${departamento} 📍\n\n¿De qué municipio?`, 'bot',
-        municipios.map(muni => ({
-          label: muni,
-          value: `muni_directo_${muni}`
-        }))
-      );
-      return;
-    }
-
-    // Municipio (flujo normal 1-2 productos)
-    if (input.startsWith('muni_') && !input.startsWith('muni_directo_')) {
-      const municipio = input.replace('muni_', '');
-      setSessionData(prev => ({ ...prev, municipio: municipio, step: 'buscando_encomiendistas' }));
-      
-      addMessage(`Buscando opciones en ${municipio}... 🔍`, 'bot');
-      
-      const hayEncomiendas = await cargarEncomiendistas(session.departamento, municipio, session.tipo_entrega);
-      
-      if (hayEncomiendas) {
-        setSessionData(prev => ({ ...prev, step: 'seleccionar_encomiendista' }));
-        mostrarEncomiendistasConFoto();
-      } else {
-        addMessage(`⚠️ No encontré opciones para ${municipio}`, 'bot', [
-          { label: "📞 Contactar agente", value: "agente" },
-          { label: "🔙 Cambiar municipio", value: "cambiar_municipio" }
+        addMessage("📦 ¿Cómo deseas recibir tu pedido?", 'bot', [
+          { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
+          { label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" },
+          { label: "📦 CASILLERO", value: "tipo_casillero" }
         ]);
       }
       return;
     }
 
-    // Municipio (flujo directo 3+ productos)
-    if (input.startsWith('muni_directo_')) {
-      const municipio = input.replace('muni_directo_', '');
-      setSessionData(prev => ({ ...prev, municipio: municipio, step: 'punto_referencia_directo' }));
-      
-      addMessage(`📍 ${municipio}\n\n¿Cuál es tu punto de referencia para la entrega?`, 'bot');
+    // PUNTO FIJO no disponible para 3+ productos
+    if (input === 'tipo_punto_fijo_3mas') {
+      addMessage("⚠️ PUNTO FIJO no está disponible para pedidos de 3 o más productos.\n\nPor favor elige otra opción:", 'bot', [
+        { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
+        { label: "📦 CASILLERO", value: "tipo_casillero" }
+      ]);
       return;
     }
 
-    // Punto de referencia (3+ productos)
-    if (session.step === 'punto_referencia_directo') {
+    // Seleccionar PERSONALIZADO
+    if (input === 'tipo_personalizado') {
+      setSessionData(prev => ({ 
+        ...prev, 
+        tipo_entrega: 'PERSONALIZADO',
+        costo_envio: 3.50,
+        step: 'departamento_personalizado' 
+      }));
+      
+      addMessage(`✅ Envío PERSONALIZADO - $3.50\n\n📍 ¿De qué departamento eres?`, 'bot',
+        Object.keys(DEPARTAMENTOS_MUNICIPIOS).map(dep => ({
+          label: dep,
+          value: `dep_pers_${dep}`
+        }))
+      );
+      return;
+    }
+
+    // Seleccionar PUNTO FIJO
+    if (input === 'tipo_punto_fijo') {
+      setSessionData(prev => ({ 
+        ...prev, 
+        tipo_entrega: 'PUNTO FIJO',
+        step: 'buscando_departamentos_punto_fijo'
+      }));
+      
+      addMessage("📍 Buscando puntos fijos disponibles... 🔍", 'bot');
+      
+      try {
+        const response = await fetch(`${SCRIPT_URL}?route=encomiendas&tipo_entrega=PUNTO FIJO`);
+        const data = await response.json();
+        
+        if (data.items && data.items.length > 0) {
+          const deptosSet = new Set();
+          data.items.forEach(enc => {
+            if (enc.DEPARTAMENTO) deptosSet.add(enc.DEPARTAMENTO);
+          });
+          
+          const deptosArray = Array.from(deptosSet).sort();
+          
+          if (deptosArray.length > 0) {
+            setSessionData(prev => ({ ...prev, step: 'departamento_punto_fijo' }));
+            addMessage(`📍 PUNTO FIJO disponible en:\n\n¿De qué departamento eres?`, 'bot',
+              deptosArray.map(dep => ({
+                label: dep,
+                value: `dep_pf_${dep}`
+              }))
+            );
+          } else {
+            addMessage("⚠️ No hay puntos fijos disponibles", 'bot', [
+              { label: "🏠 Cambiar a PERSONALIZADO", value: "tipo_personalizado" },
+              { label: "📦 Ver CASILLEROS", value: "tipo_casillero" },
+              { label: "📞 Contactar agente", value: "agente" }
+            ]);
+          }
+        } else {
+          addMessage("⚠️ No hay puntos fijos disponibles", 'bot', [
+            { label: "🏠 Cambiar a PERSONALIZADO", value: "tipo_personalizado" },
+            { label: "📦 Ver CASILLEROS", value: "tipo_casillero" },
+            { label: "📞 Contactar agente", value: "agente" }
+          ]);
+        }
+      } catch (error) {
+        addMessage("❌ Error al buscar puntos fijos", 'bot');
+      }
+      return;
+    }
+
+    // Seleccionar CASILLERO
+    if (input === 'tipo_casillero') {
+      setSessionData(prev => ({ 
+        ...prev, 
+        tipo_entrega: 'CASILLERO',
+        step: 'buscando_departamentos_casillero'
+      }));
+      
+      addMessage("📦 Buscando casilleros disponibles... 🔍", 'bot');
+      
+      try {
+        const response = await fetch(`${SCRIPT_URL}?route=encomiendas&tipo_entrega=CASILLERO`);
+        const data = await response.json();
+        
+        if (data.items && data.items.length > 0) {
+          const deptosSet = new Set();
+          data.items.forEach(enc => {
+            if (enc.DEPARTAMENTO) deptosSet.add(enc.DEPARTAMENTO);
+          });
+          
+          const deptosArray = Array.from(deptosSet).sort();
+          
+          if (deptosArray.length > 0) {
+            setSessionData(prev => ({ ...prev, step: 'departamento_casillero' }));
+            addMessage(`📦 CASILLERO disponible en:\n\n¿De qué departamento eres?`, 'bot',
+              deptosArray.map(dep => ({
+                label: dep,
+                value: `dep_cas_${dep}`
+              }))
+            );
+          } else {
+            addMessage("⚠️ No hay casilleros disponibles", 'bot', [
+              { label: "🏠 Cambiar a PERSONALIZADO", value: "tipo_personalizado" },
+              { label: "📍 Ver PUNTOS FIJOS", value: "tipo_punto_fijo" },
+              { label: "📞 Contactar agente", value: "agente" }
+            ]);
+          }
+        } else {
+          addMessage("⚠️ No hay casilleros disponibles", 'bot', [
+            { label: "🏠 Cambiar a PERSONALIZADO", value: "tipo_personalizado" },
+            { label: "📍 Ver PUNTOS FIJOS", value: "tipo_punto_fijo" },
+            { label: "📞 Contactar agente", value: "agente" }
+          ]);
+        }
+      } catch (error) {
+        addMessage("❌ Error al buscar casilleros", 'bot');
+      }
+      return;
+    }
+
+    // Departamento PERSONALIZADO
+    if (input.startsWith('dep_pers_')) {
+      const departamento = input.replace('dep_pers_', '');
+      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
+      
+      setSessionData(prev => ({ ...prev, departamento: departamento, step: 'municipio_personalizado' }));
+      addMessage(`${departamento} 📍\n\n¿De qué municipio?`, 'bot',
+        municipios.map(muni => ({
+          label: muni,
+          value: `muni_pers_${muni}`
+        }))
+      );
+      return;
+    }
+
+    // Departamento PUNTO FIJO
+    if (input.startsWith('dep_pf_')) {
+      const departamento = input.replace('dep_pf_', '');
+      
+      setSessionData(prev => ({ ...prev, departamento: departamento, step: 'buscando_municipios_punto_fijo' }));
+      addMessage("Buscando municipios con puntos fijos... 🔍", 'bot');
+      
+      try {
+        const response = await fetch(`${SCRIPT_URL}?route=encomiendas&tipo_entrega=PUNTO FIJO&departamento=${encodeURIComponent(departamento)}`);
+        const data = await response.json();
+        
+        if (data.items && data.items.length > 0) {
+          const munisSet = new Set();
+          data.items.forEach(enc => {
+            if (enc.MUNICIPIO) munisSet.add(enc.MUNICIPIO);
+          });
+          
+          const munisArray = Array.from(munisSet).sort();
+          
+          if (munisArray.length > 0) {
+            setSessionData(prev => ({ ...prev, step: 'municipio_punto_fijo' }));
+            addMessage(`${departamento} 📍\n\n¿De qué municipio?`, 'bot',
+              munisArray.map(muni => ({
+                label: muni,
+                value: `muni_pf_${muni}`
+              }))
+            );
+          } else {
+            addMessage("⚠️ No hay puntos fijos en este departamento", 'bot', [
+              { label: "🔙 Elegir otro departamento", value: "tipo_punto_fijo" }
+            ]);
+          }
+        }
+      } catch (error) {
+        addMessage("❌ Error al buscar municipios", 'bot');
+      }
+      return;
+    }
+
+    // Departamento CASILLERO
+    if (input.startsWith('dep_cas_')) {
+      const departamento = input.replace('dep_cas_', '');
+      
+      setSessionData(prev => ({ ...prev, departamento: departamento, step: 'buscando_municipios_casillero' }));
+      addMessage("Buscando municipios con casilleros... 🔍", 'bot');
+      
+      try {
+        const response = await fetch(`${SCRIPT_URL}?route=encomiendas&tipo_entrega=CASILLERO&departamento=${encodeURIComponent(departamento)}`);
+        const data = await response.json();
+        
+        if (data.items && data.items.length > 0) {
+          const munisSet = new Set();
+          data.items.forEach(enc => {
+            if (enc.MUNICIPIO) munisSet.add(enc.MUNICIPIO);
+          });
+          
+          const munisArray = Array.from(munisSet).sort();
+          
+          if (munisArray.length > 0) {
+            setSessionData(prev => ({ ...prev, step: 'municipio_casillero' }));
+            addMessage(`${departamento} 📍\n\n¿De qué municipio?`, 'bot',
+              munisArray.map(muni => ({
+                label: muni,
+                value: `muni_cas_${muni}`
+              }))
+            );
+          } else {
+            addMessage("⚠️ No hay casilleros en este departamento", 'bot', [
+              { label: "🔙 Elegir otro departamento", value: "tipo_casillero" }
+            ]);
+          }
+        }
+      } catch (error) {
+        addMessage("❌ Error al buscar municipios", 'bot');
+      }
+      return;
+    }
+
+    // Municipio PERSONALIZADO
+    if (input.startsWith('muni_pers_')) {
+      const municipio = input.replace('muni_pers_', '');
+      setSessionData(prev => ({ ...prev, municipio: municipio, step: 'punto_referencia_personalizado' }));
+      
+      addMessage(`📍 ${session.departamento} - ${municipio}\n\n¿Cuál es tu punto de referencia para la entrega?\n(Ejemplo: Frente a gasolinera Shell)`, 'bot');
+      return;
+    }
+
+    // Municipio PUNTO FIJO
+    if (input.startsWith('muni_pf_')) {
+      const municipio = input.replace('muni_pf_', '');
+      
+      setSessionData(prev => ({ ...prev, municipio: municipio, step: 'buscando_encomiendistas_punto_fijo' }));
+      addMessage(`Buscando puntos fijos en ${municipio}... 🔍`, 'bot');
+      
+      const hayEncomiendas = await cargarEncomiendistas(session.departamento, municipio, 'PUNTO FIJO');
+      
+      if (hayEncomiendas) {
+        setSessionData(prev => ({ ...prev, step: 'seleccionar_encomiendista' }));
+        mostrarEncomiendistasConFoto();
+      } else {
+        addMessage(`⚠️ No encontré puntos fijos en ${municipio}`, 'bot', [
+          { label: "🔙 Elegir otro municipio", value: `dep_pf_${session.departamento}` }
+        ]);
+      }
+      return;
+    }
+
+    // Municipio CASILLERO
+    if (input.startsWith('muni_cas_')) {
+      const municipio = input.replace('muni_cas_', '');
+      
+      setSessionData(prev => ({ ...prev, municipio: municipio, step: 'buscando_casilleros' }));
+      addMessage(`Buscando casilleros en ${municipio}... 🔍`, 'bot');
+      
+      const hayCasilleros = await cargarEncomiendistas(session.departamento, municipio, 'CASILLERO');
+      
+      if (hayCasilleros) {
+        setSessionData(prev => ({ ...prev, step: 'seleccionar_encomiendista' }));
+        mostrarEncomiendistasConFoto();
+      } else {
+        addMessage(`⚠️ No encontré casilleros en ${municipio}`, 'bot', [
+          { label: "🔙 Elegir otro municipio", value: `dep_cas_${session.departamento}` }
+        ]);
+      }
+      return;
+    }
+
+    // Punto de referencia PERSONALIZADO
+    if (session.step === 'punto_referencia_personalizado') {
       setSessionData(prev => ({ 
         ...prev, 
         punto_referencia: userInput.trim(),
         direccion: userInput.trim(),
+        encomiendista: 'PERSONALIZADO',
+        encomiendista_nombre: 'Envío Personalizado',
         step: 'metodo_pago'
       }));
       
@@ -535,7 +710,7 @@ export default function ChatBot() {
       return;
     }
 
-    // Seleccionar encomiendista
+    // Seleccionar encomiendista (PUNTO FIJO o CASILLERO)
     if (input.startsWith('enc_')) {
       const idx = parseInt(input.split('_')[1]);
       const encomiendista = encomiendistas[idx];
@@ -550,33 +725,15 @@ export default function ChatBot() {
           dia_entrega: encomiendista.DIA_ENTREGA || '',
           hora_entrega: encomiendista.HORA_ENTREGA || '',
           punto_referencia: encomiendista.PUNTO_REFERENCIA || '',
-          step: 'direccion'
+          step: 'metodo_pago'
         }));
         
-        addMessage(`✅ Seleccionaste: ${encomiendista.ENCOMIENDISTA}\n💵 Costo: $${encomiendista.COSTO_ENVIO}\n\n¿Cuál es tu dirección completa?`, 'bot');
+        const tipoTexto = session.tipo_entrega === 'PUNTO FIJO' ? 'punto fijo' : 'casillero';
+        addMessage(`✅ Seleccionaste ${tipoTexto}: ${encomiendista.ENCOMIENDISTA}\n📍 ${encomiendista.PUNTO_REFERENCIA}\n💵 Costo: $${encomiendista.COSTO_ENVIO}\n\n¿Cómo deseas pagar?`, 'bot', [
+          { label: "💵 Contra entrega", value: "contra_entrega" },
+          { label: "💳 Transferencia", value: "transferencia" }
+        ]);
       }
-      return;
-    }
-
-    if (input === 'cambiar_municipio') {
-      setSessionData(prev => ({ ...prev, step: 'municipio' }));
-      const municipios = DEPARTAMENTOS_MUNICIPIOS[session.departamento] || [];
-      addMessage("¿De qué municipio?", 'bot',
-        municipios.map(muni => ({
-          label: muni,
-          value: `muni_${muni}`
-        }))
-      );
-      return;
-    }
-
-    // Dirección
-    if (session.step === 'direccion') {
-      setSessionData(prev => ({ ...prev, direccion: userInput.trim(), step: 'metodo_pago' }));
-      addMessage("Perfecto 🏠\n\n¿Cómo deseas pagar?", 'bot', [
-        { label: "💵 Contra entrega", value: "contra_entrega" },
-        { label: "💳 Transferencia", value: "transferencia" }
-      ]);
       return;
     }
 
@@ -615,22 +772,37 @@ export default function ChatBot() {
     });
     
     resumen += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
-    resumen += `🚚 Envío (${sessionData.tipo_entrega}): $${sessionData.costo_envio.toFixed(2)}\n`;
+    
+    // Mostrar tipo de envío con emoji
+    let tipoEnvioTexto = sessionData.tipo_entrega;
+    if (sessionData.tipo_entrega === 'PERSONALIZADO') {
+      tipoEnvioTexto = '🏠 PERSONALIZADO';
+    } else if (sessionData.tipo_entrega === 'PUNTO FIJO') {
+      tipoEnvioTexto = '📍 PUNTO FIJO';
+    } else if (sessionData.tipo_entrega === 'CASILLERO') {
+      tipoEnvioTexto = '📦 CASILLERO';
+    }
+    
+    resumen += `🚚 Envío (${tipoEnvioTexto}): $${sessionData.costo_envio.toFixed(2)}\n`;
     resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
     
     resumen += `📍 ${sessionData.departamento} - ${sessionData.municipio}\n`;
     
-    if (sessionData.direccion) {
-      resumen += `🏠 ${sessionData.direccion}\n`;
-    }
-    if (sessionData.punto_referencia) {
-      resumen += `📌 ${sessionData.punto_referencia}\n`;
-    }
-    if (sessionData.encomiendista_nombre) {
-      resumen += `🚛 ${sessionData.encomiendista_nombre}\n`;
-    }
-    if (sessionData.dia_entrega) {
-      resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+    if (sessionData.tipo_entrega === 'PERSONALIZADO') {
+      if (sessionData.punto_referencia) {
+        resumen += `📌 ${sessionData.punto_referencia}\n`;
+      }
+    } else {
+      // PUNTO FIJO o CASILLERO
+      if (sessionData.encomiendista_nombre) {
+        resumen += `🚛 ${sessionData.encomiendista_nombre}\n`;
+      }
+      if (sessionData.punto_referencia) {
+        resumen += `📍 ${sessionData.punto_referencia}\n`;
+      }
+      if (sessionData.dia_entrega) {
+        resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+      }
     }
     
     resumen += `💳 ${sessionData.metodo_pago}\n\n`;
