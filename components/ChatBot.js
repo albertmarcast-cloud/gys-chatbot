@@ -286,14 +286,24 @@ export default function ChatBot() {
     mensaje += `🚚 Envío (${sessionData.tipo_entrega}): $${sessionData.costo_envio.toFixed(2)}\n`;
     mensaje += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
     
-    mensaje += `📍 ${sessionData.departamento} - ${sessionData.municipio}\n`;
-    mensaje += `🏠 ${sessionData.direccion}\n`;
-    mensaje += `📌 ${sessionData.punto_referencia}\n`;
-    mensaje += `🚛 Encomienda: ${sessionData.encomiendista_nombre}\n`;
-    if (sessionData.dia_entrega) {
-      mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+    mensaje += `📍 *UBICACIÓN:*\n`;
+    mensaje += `Departamento: ${sessionData.departamento}\n`;
+    mensaje += `Municipio: ${sessionData.municipio}\n`;
+    
+    if (sessionData.tipo_entrega === 'PUNTO_FIJO') {
+      mensaje += `\n🚚 *PUNTO FIJO - $3.50*\n`;
+      mensaje += `📦 Punto de entrega: ${sessionData.punto_referencia}\n`;
+    } else if (sessionData.tipo_entrega === 'PERSONALIZADO') {
+      mensaje += `\n🚚 *ENVÍO PERSONALIZADO*\n`;
+      mensaje += `🏠 Dirección: ${sessionData.direccion}\n`;
+      mensaje += `📌 Referencia: ${sessionData.punto_referencia}\n`;
+      mensaje += `🚛 Encomienda: ${sessionData.encomiendista_nombre}\n`;
+      if (sessionData.dia_entrega) {
+        mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+      }
     }
-    mensaje += `💳 *Pago:* ${sessionData.metodo_pago}\n\n`;
+    
+    mensaje += `\n💳 *Pago:* ${sessionData.metodo_pago}\n\n`;
     mensaje += `✨ _Pedido desde chatbot automático_`;
 
     const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(mensaje)}`;
@@ -477,25 +487,19 @@ export default function ChatBot() {
     // Seleccionar municipio (PUNTO FIJO)
     if (input.startsWith('muni_pf_')) {
       const municipio = input.replace('muni_pf_', '');
-      setSessionData(prev => ({ ...prev, municipio: municipio, step: 'buscando_puntos_fijos' }));
+      setSessionData(prev => ({ 
+        ...prev, 
+        municipio: municipio, 
+        tipo_entrega: 'PUNTO_FIJO',
+        costo_envio: 3.50,
+        step: 'direccion_punto_fijo' 
+      }));
       
-      addMessage(`Buscando puntos fijos en ${municipio}... 🔍`, 'bot');
-      
-      const hayPuntos = await cargarEncomiendistas(municipio, 'PUNTO_FIJO');
-      
-      if (hayPuntos) {
-        setSessionData(prev => ({ ...prev, step: 'seleccionar_punto_fijo' }));
-        mostrarEncomiendistasConFoto();
-      } else {
-        addMessage(`⚠️ No hay puntos fijos en ${municipio}\n\n¿Deseas cambiar a envío PERSONALIZADO?`, 'bot', [
-          { label: "🚚 Cambiar a PERSONALIZADO", value: "cambiar_a_personalizado" },
-          { label: "📞 Contactar agente", value: "agente" }
-        ]);
-      }
+      addMessage(`📍 ${municipio} - PUNTO FIJO\n💵 Costo: $3.50\n\n¿Cuál es tu punto de entrega? (Ejemplo: Gasolinera Shell, Tienda La Económica, etc.)`, 'bot');
       return;
     }
 
-    // Cambiar a personalizado
+    // Cambiar a personalizado (desde inicio si no hay cobertura)
     if (input === 'cambiar_a_personalizado') {
       setSessionData(prev => ({ ...prev, tipo_entrega: 'PERSONALIZADO', step: 'departamento' }));
       addMessage("📍 ¿De qué departamento eres?", 'bot',
@@ -546,6 +550,24 @@ export default function ChatBot() {
           addMessage(`✅ Encomienda: ${encomiendista.ENCOMIENDISTA}\n💵 Costo: $${encomiendista.COSTO_ENVIO}\n\n¿Cuál es tu dirección completa?`, 'bot');
         }
       }
+      return;
+    }
+
+    // Dirección de PUNTO FIJO
+    if (session.step === 'direccion_punto_fijo') {
+      setSessionData(prev => ({ 
+        ...prev, 
+        punto_referencia: userInput.trim(),
+        direccion: userInput.trim(),
+        encomiendista: 'PUNTO_FIJO',
+        encomiendista_nombre: 'Punto Fijo',
+        step: 'metodo_pago'
+      }));
+      
+      addMessage(`✅ Punto de entrega: ${userInput.trim()}\n💵 Costo: $3.50\n\n¿Cómo deseas pagar?`, 'bot', [
+        { label: "💵 Contra entrega", value: "contra_entrega" },
+        { label: "💳 Transferencia", value: "transferencia" }
+      ]);
       return;
     }
 
@@ -609,14 +631,18 @@ export default function ChatBot() {
     resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
     
     resumen += `📍 ${sessionData.departamento} - ${sessionData.municipio}\n`;
-    if (sessionData.tipo_entrega === 'PERSONALIZADO') {
+    
+    if (sessionData.tipo_entrega === 'PUNTO_FIJO') {
+      resumen += `📦 Punto de entrega: ${sessionData.punto_referencia}\n`;
+    } else if (sessionData.tipo_entrega === 'PERSONALIZADO') {
       resumen += `🏠 ${sessionData.direccion}\n`;
       resumen += `📌 ${sessionData.punto_referencia}\n`;
+      resumen += `🚛 ${sessionData.encomiendista_nombre}\n`;
+      if (sessionData.dia_entrega) {
+        resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+      }
     }
-    resumen += `🚛 ${sessionData.encomiendista_nombre}\n`;
-    if (sessionData.dia_entrega) {
-      resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
-    }
+    
     resumen += `💳 ${sessionData.metodo_pago}\n\n`;
     resumen += `¿Todo correcto?`;
 
