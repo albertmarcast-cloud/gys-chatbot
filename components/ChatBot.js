@@ -669,46 +669,48 @@ export default function ChatBot() {
             <div className={`max-w-[80%] ${msg.sender === 'user' ? 'bg-purple-500 text-white' : 'bg-white text-gray-800'} rounded-2xl px-4 py-3 shadow-md`}>
               <p className="whitespace-pre-wrap">{msg.text}</p>
               {msg.options && (
-                <div className="flex flex-col gap-2 mt-3">
-                  {msg.options.map((opt, i) => (
-                    <div key={i}>
-                      <button
-                        onClick={() => handleOptionClick(opt.value)}
-                        className="w-full bg-gradient-to-r from-pink-400 to-purple-500 text-white px-4 py-2 rounded-lg hover:from-pink-500 hover:to-purple-600 transition-all text-sm font-medium text-left"
-                      >
-                        {opt.label}
-                      </button>
-                      {opt.extra && (
-                        <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          {opt.extra.foto && (
-                            <img 
-                              src={opt.extra.foto} 
-                              alt={opt.label}
-                              className="w-full h-32 object-cover rounded-lg mb-2"
-                              onError={(e) => e.target.style.display = 'none'}
-                            />
-                          )}
-                          <div className="space-y-1 text-xs text-gray-600">
-                            {opt.extra.punto && (
-                              <p className="flex items-center gap-1">
-                                <MapPin className="w-3 h-3" /> {opt.extra.punto}
-                              </p>
+                <div className={`mt-3 ${msg.options.length > 6 ? 'max-h-96 overflow-y-auto' : ''}`}>
+                  <div className={`grid ${msg.options.length > 6 ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+                    {msg.options.map((opt, i) => (
+                      <div key={i}>
+                        <button
+                          onClick={() => handleOptionClick(opt.value)}
+                          className="w-full bg-gradient-to-r from-pink-400 to-purple-500 text-white px-4 py-2 rounded-lg hover:from-pink-500 hover:to-purple-600 transition-all text-sm font-medium text-left"
+                        >
+                          {opt.label}
+                        </button>
+                        {opt.extra && (
+                          <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            {opt.extra.foto && (
+                              <img 
+                                src={opt.extra.foto} 
+                                alt={opt.label}
+                                className="w-full h-32 object-cover rounded-lg mb-2"
+                                onError={(e) => e.target.style.display = 'none'}
+                              />
                             )}
-                            {opt.extra.costo !== undefined && (
-                              <p className="flex items-center gap-1 font-semibold text-purple-600">
-                                <DollarSign className="w-3 h-3" /> ${opt.extra.costo}
-                              </p>
-                            )}
-                            {opt.extra.dia && (
-                              <p className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> {opt.extra.dia} | {opt.extra.hora}
-                              </p>
-                            )}
+                            <div className="space-y-1 text-xs text-gray-600">
+                              {opt.extra.punto && (
+                                <p className="flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" /> {opt.extra.punto}
+                                </p>
+                              )}
+                              {opt.extra.costo !== undefined && (
+                                <p className="flex items-center gap-1 font-semibold text-purple-600">
+                                  <DollarSign className="w-3 h-3" /> ${opt.extra.costo}
+                                </p>
+                              )}
+                              {opt.extra.dia && (
+                                <p className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" /> {opt.extra.dia} | {opt.extra.hora}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
