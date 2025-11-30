@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, ShoppingBag, Package, ChevronLeft, ChevronRight, Loader2, Truck, MapPin, Image as ImageIcon } from 'lucide-react';
+import { Send, ShoppingBag, Package, ChevronLeft, ChevronRight, Loader2, Truck, MapPin, Clock, DollarSign } from 'lucide-react';
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOHi4qZyxwvdGy826isCABC7JQqeEGvZ8kFT9FzbVi_s5NYKFkHZFVrtoQB6r9NpM/exec";
 const WHATSAPP_NEGOCIO = "50375936319";
@@ -27,6 +27,7 @@ export default function ChatBot() {
   const [input, setInput] = useState('');
   const [catalogo, setCatalogo] = useState([]);
   const [encomiendistas, setEncomiendistas] = useState([]);
+  const [tiposEnvioDisponibles, setTiposEnvioDisponibles] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [loadingEncomiendas, setLoadingEncomiendas] = useState(false);
   const [sessionData, setSessionData] = useState({
@@ -38,7 +39,7 @@ export default function ChatBot() {
     municipio: '',
     direccion: '',
     punto_referencia: '',
-    tipo_entrega: '', // PERSONALIZADO o PUNTO_FIJO
+    tipo_entrega: '',
     metodo_pago: '',
     encomiendista: '',
     encomiendista_nombre: '',
@@ -99,16 +100,56 @@ export default function ChatBot() {
     setLoadingCatalog(false);
   };
 
-  const cargarEncomiendistas = async (municipio, tipoEntrega) => {
+  // 🆕 Obtener tipos de envío únicos disponibles
+  const obtenerTiposEnvio = async () => {
     setLoadingEncomiendas(true);
     try {
-      const url = `${SCRIPT_URL}?route=encomiendas&municipio=${encodeURIComponent(municipio)}&tipo_entrega=${tipoEntrega.toLowerCase()}`;
+      const url = `${SCRIPT_URL}?route=encomiendas`;
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (!data.error && data.items) {
+        // Extraer tipos únicos
+        const tiposSet = new Set();
+        data.items.forEach(enc => {
+          const tipos = (enc.TIPOS_DE_ENVIO_DISPONIBLES || '').split(',');
+          tipos.forEach(tipo => {
+            const tipoLimpio = tipo.trim().toUpperCase();
+            if (tipoLimpio) tiposSet.add(tipoLimpio);
+          });
+        });
+        
+        const tiposArray = Array.from(tiposSet);
+        setTiposEnvioDisponibles(tiposArray);
+        
+        if (tiposArray.length > 0) {
+          addMessage("📦 Selecciona el tipo de envío:", 'bot', 
+            tiposArray.map(tipo => ({
+              label: `${tipo === 'PERSONALIZADO' ? '🏠' : tipo === 'PUNTO FIJO' ? '📍' : '🚚'} ${tipo}`,
+              value: `tipo_${tipo}`
+            }))
+          );
+        } else {
+          addMessage("⚠️ No hay opciones de envío disponibles. Contacta con un agente.", 'bot', [
+            { label: "📞 Contactar agente", value: "agente" }
+          ]);
+        }
+      }
+    } catch (error) {
+      addMessage("❌ Error al cargar opciones de envío.", 'bot');
+    }
+    setLoadingEncomiendas(false);
+  };
+
+  const cargarEncomiendistas = async (departamento, municipio, tipoEnvio) => {
+    setLoadingEncomiendas(true);
+    try {
+      const url = `${SCRIPT_URL}?route=encomiendas&departamento=${encodeURIComponent(departamento)}&municipio=${encodeURIComponent(municipio)}&tipo_entrega=${encodeURIComponent(tipoEnvio)}`;
       
       const response = await fetch(url);
       const data = await response.json();
       
       if (data.error) {
-        addMessage("❌ Error al buscar encomiendistas. Intenta de nuevo.", 'bot');
         setEncomiendistas([]);
         return false;
       } else {
@@ -117,7 +158,6 @@ export default function ChatBot() {
         return items.length > 0;
       }
     } catch (error) {
-      addMessage("❌ Error de conexión. Verifica tu internet.", 'bot');
       setEncomiendistas([]);
       return false;
     } finally {
@@ -128,19 +168,19 @@ export default function ChatBot() {
   const mostrarEncomiendistasConFoto = () => {
     if (encomiendistas.length === 0) return;
 
-    const opciones = encomiendistas.slice(0, 5).map((enc, idx) => ({
-      label: `${idx + 1}. ${enc.ENCOMIENDISTA} - $${enc.COSTO_ENVIO}`,
-      value: `encomiendista_${idx}`,
-      extra: {
-        foto: enc.FOTO_REFERENCIA,
-        telefono: enc.TELEFONO_ENCOMIENDISTA,
-        dia: enc.DIA_ENTREGA,
-        hora: enc.HORA_ENTREGA,
-        punto: enc.PUNTO_REFERENCIA
-      }
-    }));
-
-    addMessage(`📦 Encontré ${encomiendistas.length} opciones de envío:`, 'bot', opciones);
+    addMessage(`✨ Encontré ${encomiendistas.length} opciones de envío:\n\nSelecciona la que prefieras:`, 'bot', 
+      encomiendistas.map((enc, idx) => ({
+        label: `${enc.ENCOMIENDISTA}`,
+        value: `enc_${idx}`,
+        extra: {
+          foto: enc.FOTO_REFERENCIA,
+          punto: enc.PUNTO_REFERENCIA,
+          costo: enc.COSTO_ENVIO,
+          dia: enc.DIA_ENTREGA,
+          hora: enc.HORA_ENTREGA
+        }
+      }))
+    );
   };
 
   const getFilteredCatalog = () => {
@@ -287,20 +327,19 @@ export default function ChatBot() {
     mensaje += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
     
     mensaje += `📍 *UBICACIÓN:*\n`;
-    mensaje += `Departamento: ${sessionData.departamento}\n`;
-    mensaje += `Municipio: ${sessionData.municipio}\n`;
+    mensaje += `${sessionData.departamento} - ${sessionData.municipio}\n`;
     
-    if (sessionData.tipo_entrega === 'PUNTO_FIJO') {
-      mensaje += `\n🚚 *PUNTO FIJO - $3.50*\n`;
-      mensaje += `📦 Punto de entrega: ${sessionData.punto_referencia}\n`;
-    } else if (sessionData.tipo_entrega === 'PERSONALIZADO') {
-      mensaje += `\n🚚 *ENVÍO PERSONALIZADO*\n`;
-      mensaje += `🏠 Dirección: ${sessionData.direccion}\n`;
-      mensaje += `📌 Referencia: ${sessionData.punto_referencia}\n`;
-      mensaje += `🚛 Encomienda: ${sessionData.encomiendista_nombre}\n`;
-      if (sessionData.dia_entrega) {
-        mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
-      }
+    if (sessionData.direccion) {
+      mensaje += `🏠 ${sessionData.direccion}\n`;
+    }
+    if (sessionData.punto_referencia) {
+      mensaje += `📌 ${sessionData.punto_referencia}\n`;
+    }
+    if (sessionData.encomiendista_nombre) {
+      mensaje += `🚛 ${sessionData.encomiendista_nombre}\n`;
+    }
+    if (sessionData.dia_entrega) {
+      mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
     }
     
     mensaje += `\n💳 *Pago:* ${sessionData.metodo_pago}\n\n`;
@@ -347,7 +386,6 @@ export default function ChatBot() {
       return;
     }
 
-    // Ver catálogo
     if (input === 'catalogo') {
       setShowCarousel(true);
       setCarouselIndex(0);
@@ -355,7 +393,6 @@ export default function ChatBot() {
       return;
     }
 
-    // Hablar con agente
     if (input === 'agente') {
       const msg = `Hola, soy ${session.nombre} y necesito ayuda con un pedido`;
       const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(msg)}`;
@@ -374,7 +411,7 @@ export default function ChatBot() {
       return;
     }
 
-    // NUEVO: Continuar con pedido según cantidad
+    // 🆕 CONTINUAR PEDIDO: Lógica según cantidad
     if (input === 'continuar_pedido') {
       if (session.carrito.length === 0) {
         addMessage("⚠️ Tu carrito está vacío. Agrega productos primero.", 'bot');
@@ -385,29 +422,35 @@ export default function ChatBot() {
       const totalProductos = session.carrito.reduce((sum, item) => sum + item.CANTIDAD, 0);
 
       if (totalProductos >= 3) {
-        // 3+ productos: Solo PERSONALIZADO
-        setSessionData(prev => ({ ...prev, tipo_entrega: 'PERSONALIZADO', step: 'departamento' }));
-        addMessage("📦 Tienes 3 o más productos.\n\n🚚 Envío PERSONALIZADO\n\n📍 ¿De qué departamento eres?", 'bot', 
+        // 3+ productos: Solo PERSONALIZADO - Costo fijo $3.50
+        setSessionData(prev => ({ 
+          ...prev, 
+          tipo_entrega: 'PERSONALIZADO',
+          costo_envio: 3.50,
+          step: 'departamento_directo' 
+        }));
+        
+        addMessage("📦 Tienes 3 o más productos\n🚚 Envío PERSONALIZADO - $3.50\n\n📍 ¿De qué departamento eres?", 'bot', 
           Object.keys(DEPARTAMENTOS_MUNICIPIOS).map(dep => ({
             label: dep,
-            value: `dep_${dep}`
+            value: `dep_directo_${dep}`
           }))
         );
       } else {
-        // 1-2 productos: Elegir tipo de envío
+        // 1-2 productos: Mostrar tipos disponibles
         setSessionData(prev => ({ ...prev, step: 'tipo_envio' }));
-        addMessage("¿Cómo deseas recibir tu pedido?", 'bot', [
-          { label: "🚚 Envío PERSONALIZADO (a tu dirección)", value: "personalizado" },
-          { label: "📍 PUNTO FIJO ($3.50)", value: "punto_fijo" }
-        ]);
+        addMessage("Buscando opciones de envío disponibles... 🔍", 'bot');
+        await obtenerTiposEnvio();
       }
       return;
     }
 
-    // Elegir PERSONALIZADO
-    if (input === 'personalizado') {
-      setSessionData(prev => ({ ...prev, tipo_entrega: 'PERSONALIZADO', step: 'departamento' }));
-      addMessage("📍 ¿De qué departamento eres?", 'bot',
+    // Seleccionar tipo de envío (1-2 productos)
+    if (input.startsWith('tipo_')) {
+      const tipo = input.replace('tipo_', '');
+      setSessionData(prev => ({ ...prev, tipo_entrega: tipo, step: 'departamento' }));
+      
+      addMessage(`✅ Seleccionaste: ${tipo}\n\n📍 ¿De qué departamento eres?`, 'bot',
         Object.keys(DEPARTAMENTOS_MUNICIPIOS).map(dep => ({
           label: dep,
           value: `dep_${dep}`
@@ -416,30 +459,13 @@ export default function ChatBot() {
       return;
     }
 
-    // Elegir PUNTO FIJO
-    if (input === 'punto_fijo') {
-      setSessionData(prev => ({ 
-        ...prev, 
-        tipo_entrega: 'PUNTO_FIJO',
-        costo_envio: 3.50,
-        step: 'departamento_punto_fijo'
-      }));
-      addMessage("📍 PUNTO FIJO - $3.50\n\n¿De qué departamento eres?", 'bot',
-        Object.keys(DEPARTAMENTOS_MUNICIPIOS).map(dep => ({
-          label: dep,
-          value: `dep_pf_${dep}`
-        }))
-      );
-      return;
-    }
-
-    // Seleccionar departamento (PERSONALIZADO)
-    if (input.startsWith('dep_') && !input.startsWith('dep_pf_')) {
+    // Departamento (flujo normal 1-2 productos)
+    if (input.startsWith('dep_') && !input.startsWith('dep_directo_')) {
       const departamento = input.replace('dep_', '');
       const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
       
       setSessionData(prev => ({ ...prev, departamento: departamento, step: 'municipio' }));
-      addMessage(`Seleccionaste: ${departamento} 📍\n\n¿De qué municipio?`, 'bot',
+      addMessage(`${departamento} 📍\n\n¿De qué municipio?`, 'bot',
         municipios.map(muni => ({
           label: muni,
           value: `muni_${muni}`
@@ -448,35 +474,35 @@ export default function ChatBot() {
       return;
     }
 
-    // Seleccionar departamento (PUNTO FIJO)
-    if (input.startsWith('dep_pf_')) {
-      const departamento = input.replace('dep_pf_', '');
+    // Departamento (flujo directo 3+ productos)
+    if (input.startsWith('dep_directo_')) {
+      const departamento = input.replace('dep_directo_', '');
       const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
       
-      setSessionData(prev => ({ ...prev, departamento: departamento, step: 'municipio_punto_fijo' }));
-      addMessage(`Seleccionaste: ${departamento} 📍\n\n¿De qué municipio?`, 'bot',
+      setSessionData(prev => ({ ...prev, departamento: departamento, step: 'municipio_directo' }));
+      addMessage(`${departamento} 📍\n\n¿De qué municipio?`, 'bot',
         municipios.map(muni => ({
           label: muni,
-          value: `muni_pf_${muni}`
+          value: `muni_directo_${muni}`
         }))
       );
       return;
     }
 
-    // Seleccionar municipio (PERSONALIZADO)
-    if (input.startsWith('muni_') && !input.startsWith('muni_pf_')) {
+    // Municipio (flujo normal 1-2 productos)
+    if (input.startsWith('muni_') && !input.startsWith('muni_directo_')) {
       const municipio = input.replace('muni_', '');
       setSessionData(prev => ({ ...prev, municipio: municipio, step: 'buscando_encomiendistas' }));
       
       addMessage(`Buscando opciones en ${municipio}... 🔍`, 'bot');
       
-      const hayEncomiendas = await cargarEncomiendistas(municipio, 'PERSONALIZADO');
+      const hayEncomiendas = await cargarEncomiendistas(session.departamento, municipio, session.tipo_entrega);
       
       if (hayEncomiendas) {
         setSessionData(prev => ({ ...prev, step: 'seleccionar_encomiendista' }));
         mostrarEncomiendistasConFoto();
       } else {
-        addMessage(`⚠️ No encontré encomiendistas para ${municipio}\n\n¿Deseas contactar un agente?`, 'bot', [
+        addMessage(`⚠️ No encontré opciones para ${municipio}`, 'bot', [
           { label: "📞 Contactar agente", value: "agente" },
           { label: "🔙 Cambiar municipio", value: "cambiar_municipio" }
         ]);
@@ -484,30 +510,51 @@ export default function ChatBot() {
       return;
     }
 
-    // Seleccionar municipio (PUNTO FIJO)
-    if (input.startsWith('muni_pf_')) {
-      const municipio = input.replace('muni_pf_', '');
-      setSessionData(prev => ({ 
-        ...prev, 
-        municipio: municipio, 
-        tipo_entrega: 'PUNTO_FIJO',
-        costo_envio: 3.50,
-        step: 'direccion_punto_fijo' 
-      }));
+    // Municipio (flujo directo 3+ productos)
+    if (input.startsWith('muni_directo_')) {
+      const municipio = input.replace('muni_directo_', '');
+      setSessionData(prev => ({ ...prev, municipio: municipio, step: 'punto_referencia_directo' }));
       
-      addMessage(`📍 ${municipio} - PUNTO FIJO\n💵 Costo: $3.50\n\n¿Cuál es tu punto de entrega? (Ejemplo: Gasolinera Shell, Tienda La Económica, etc.)`, 'bot');
+      addMessage(`📍 ${municipio}\n\n¿Cuál es tu punto de referencia para la entrega?`, 'bot');
       return;
     }
 
-    // Cambiar a personalizado (desde inicio si no hay cobertura)
-    if (input === 'cambiar_a_personalizado') {
-      setSessionData(prev => ({ ...prev, tipo_entrega: 'PERSONALIZADO', step: 'departamento' }));
-      addMessage("📍 ¿De qué departamento eres?", 'bot',
-        Object.keys(DEPARTAMENTOS_MUNICIPIOS).map(dep => ({
-          label: dep,
-          value: `dep_${dep}`
-        }))
-      );
+    // Punto de referencia (3+ productos)
+    if (session.step === 'punto_referencia_directo') {
+      setSessionData(prev => ({ 
+        ...prev, 
+        punto_referencia: userInput.trim(),
+        direccion: userInput.trim(),
+        step: 'metodo_pago'
+      }));
+      
+      addMessage(`✅ Punto de referencia registrado\n💵 Costo de envío: $3.50\n\n¿Cómo deseas pagar?`, 'bot', [
+        { label: "💵 Contra entrega", value: "contra_entrega" },
+        { label: "💳 Transferencia", value: "transferencia" }
+      ]);
+      return;
+    }
+
+    // Seleccionar encomiendista
+    if (input.startsWith('enc_')) {
+      const idx = parseInt(input.split('_')[1]);
+      const encomiendista = encomiendistas[idx];
+      
+      if (encomiendista) {
+        setSessionData(prev => ({ 
+          ...prev, 
+          encomiendista: encomiendista.ID_ENCOMENDISTA,
+          encomiendista_nombre: encomiendista.ENCOMIENDISTA,
+          encomiendista_telefono: encomiendista.TELEFONO_ENCOMIENDISTA,
+          costo_envio: encomiendista.COSTO_ENVIO,
+          dia_entrega: encomiendista.DIA_ENTREGA || '',
+          hora_entrega: encomiendista.HORA_ENTREGA || '',
+          punto_referencia: encomiendista.PUNTO_REFERENCIA || '',
+          step: 'direccion'
+        }));
+        
+        addMessage(`✅ Seleccionaste: ${encomiendista.ENCOMIENDISTA}\n💵 Costo: $${encomiendista.COSTO_ENVIO}\n\n¿Cuál es tu dirección completa?`, 'bot');
+      }
       return;
     }
 
@@ -523,69 +570,10 @@ export default function ChatBot() {
       return;
     }
 
-    // Seleccionar encomiendista
-    if (input.startsWith('encomiendista_')) {
-      const idx = parseInt(input.split('_')[1]);
-      const encomiendista = encomiendistas[idx];
-      
-      if (encomiendista) {
-        setSessionData(prev => ({ 
-          ...prev, 
-          encomiendista: encomiendista.ID_ENCOMENDISTA,
-          encomiendista_nombre: encomiendista.ENCOMIENDISTA,
-          encomiendista_telefono: encomiendista.TELEFONO_ENCOMIENDISTA,
-          costo_envio: session.tipo_entrega === 'PUNTO_FIJO' ? 3.50 : encomiendista.COSTO_ENVIO,
-          dia_entrega: encomiendista.DIA_ENTREGA || '',
-          hora_entrega: encomiendista.HORA_ENTREGA || '',
-          punto_referencia: encomiendista.PUNTO_REFERENCIA || '',
-          step: session.tipo_entrega === 'PUNTO_FIJO' ? 'metodo_pago' : 'direccion'
-        }));
-        
-        if (session.tipo_entrega === 'PUNTO_FIJO') {
-          addMessage(`✅ Punto fijo: ${encomiendista.ENCOMIENDISTA}\n📍 ${encomiendista.PUNTO_REFERENCIA}\n💵 Costo: $3.50\n\n¿Cómo deseas pagar?`, 'bot', [
-            { label: "💵 Contra entrega", value: "contra_entrega" },
-            { label: "💳 Transferencia", value: "transferencia" }
-          ]);
-        } else {
-          addMessage(`✅ Encomienda: ${encomiendista.ENCOMIENDISTA}\n💵 Costo: $${encomiendista.COSTO_ENVIO}\n\n¿Cuál es tu dirección completa?`, 'bot');
-        }
-      }
-      return;
-    }
-
-    // Dirección de PUNTO FIJO
-    if (session.step === 'direccion_punto_fijo') {
-      setSessionData(prev => ({ 
-        ...prev, 
-        punto_referencia: userInput.trim(),
-        direccion: userInput.trim(),
-        encomiendista: 'PUNTO_FIJO',
-        encomiendista_nombre: 'Punto Fijo',
-        step: 'metodo_pago'
-      }));
-      
-      addMessage(`✅ Punto de entrega: ${userInput.trim()}\n💵 Costo: $3.50\n\n¿Cómo deseas pagar?`, 'bot', [
-        { label: "💵 Contra entrega", value: "contra_entrega" },
-        { label: "💳 Transferencia", value: "transferencia" }
-      ]);
-      return;
-    }
-
-    // Dirección (PERSONALIZADO)
+    // Dirección
     if (session.step === 'direccion') {
-      setSessionData(prev => ({ ...prev, direccion: userInput.trim(), step: 'referencia' }));
-      addMessage("Perfecto 🏠\n\n¿Algún punto de referencia?", 'bot');
-      return;
-    }
-
-    // Punto de referencia
-    if (session.step === 'referencia') {
-      setSessionData(prev => ({ 
-        ...prev, 
-        punto_referencia: userInput.trim(),
-        step: 'metodo_pago'
-      }));
-      addMessage(`Gracias 📌\n\n¿Cómo deseas pagar?`, 'bot', [
+      setSessionData(prev => ({ ...prev, direccion: userInput.trim(), step: 'metodo_pago' }));
+      addMessage("Perfecto 🏠\n\n¿Cómo deseas pagar?", 'bot', [
         { label: "💵 Contra entrega", value: "contra_entrega" },
         { label: "💳 Transferencia", value: "transferencia" }
       ]);
@@ -632,15 +620,17 @@ export default function ChatBot() {
     
     resumen += `📍 ${sessionData.departamento} - ${sessionData.municipio}\n`;
     
-    if (sessionData.tipo_entrega === 'PUNTO_FIJO') {
-      resumen += `📦 Punto de entrega: ${sessionData.punto_referencia}\n`;
-    } else if (sessionData.tipo_entrega === 'PERSONALIZADO') {
+    if (sessionData.direccion) {
       resumen += `🏠 ${sessionData.direccion}\n`;
+    }
+    if (sessionData.punto_referencia) {
       resumen += `📌 ${sessionData.punto_referencia}\n`;
+    }
+    if (sessionData.encomiendista_nombre) {
       resumen += `🚛 ${sessionData.encomiendista_nombre}\n`;
-      if (sessionData.dia_entrega) {
-        resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
-      }
+    }
+    if (sessionData.dia_entrega) {
+      resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
     }
     
     resumen += `💳 ${sessionData.metodo_pago}\n\n`;
@@ -696,20 +686,38 @@ export default function ChatBot() {
                     <div key={i}>
                       <button
                         onClick={() => handleOptionClick(opt.value)}
-                        className="w-full bg-gradient-to-r from-pink-400 to-purple-500 text-white px-4 py-2 rounded-lg hover:from-pink-500 hover:to-purple-600 transition-all text-sm font-medium"
+                        className="w-full bg-gradient-to-r from-pink-400 to-purple-500 text-white px-4 py-2 rounded-lg hover:from-pink-500 hover:to-purple-600 transition-all text-sm font-medium text-left"
                       >
                         {opt.label}
                       </button>
-                      {opt.extra?.foto && (
-                        <img 
-                          src={opt.extra.foto} 
-                          alt={opt.label}
-                          className="w-full h-32 object-cover rounded-lg mt-2"
-                          onError={(e) => e.target.style.display = 'none'}
-                        />
-                      )}
-                      {opt.extra?.punto && (
-                        <p className="text-xs text-gray-600 mt-1">📍 {opt.extra.punto}</p>
+                      {opt.extra && (
+                        <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          {opt.extra.foto && (
+                            <img 
+                              src={opt.extra.foto} 
+                              alt={opt.label}
+                              className="w-full h-32 object-cover rounded-lg mb-2"
+                              onError={(e) => e.target.style.display = 'none'}
+                            />
+                          )}
+                          <div className="space-y-1 text-xs text-gray-600">
+                            {opt.extra.punto && (
+                              <p className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3" /> {opt.extra.punto}
+                              </p>
+                            )}
+                            {opt.extra.costo !== undefined && (
+                              <p className="flex items-center gap-1 font-semibold text-purple-600">
+                                <DollarSign className="w-3 h-3" /> ${opt.extra.costo}
+                              </p>
+                            )}
+                            {opt.extra.dia && (
+                              <p className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> {opt.extra.dia} | {opt.extra.hora}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
                   ))}
