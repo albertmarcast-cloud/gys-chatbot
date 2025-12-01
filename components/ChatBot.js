@@ -1,59 +1,350 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, ShoppingBag, Package, ChevronLeft, ChevronRight, Loader2, Truck, MapPin, Clock, DollarSign } from 'lucide-react';
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Send,
+  ShoppingBag,
+  Package,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Truck,
+  MapPin,
+  Clock,
+  DollarSign,
+} from "lucide-react";
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyhpe-wKBN55gNfw1FYX0F9hRidmfSVkb_rcxr9_v9-5vm49CPZU65185NrtYeh_NMW/exec";
+const SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbyhpe-wKBN55gNfw1FYX0F9hRidmfSVkb_rcxr9_v9-5vm49CPZU65185NrtYeh_NMW/exec";
 const WHATSAPP_NEGOCIO = "50375936319";
 
-// Departamentos y municipios de El Salvador
 const DEPARTAMENTOS_MUNICIPIOS = {
-  "Ahuachapán": ["Ahuachapán", "Apaneca", "Atiquizaya", "Concepción de Ataco", "El Refugio", "Guaymango", "Jujutla", "San Francisco Menéndez", "San Lorenzo", "San Pedro Puxtla", "Tacuba", "Turín"],
-  "Cabañas": ["Sensuntepeque", "Cinquera", "Dolores", "Guacotecti", "Ilobasco", "Jutiapa", "San Isidro", "Tejutepeque", "Victoria"],
-  "Chalatenango": ["Chalatenango", "Agua Caliente", "Arcatao", "Azacualpa", "Cancasque", "Citalá", "Comalapa", "Concepción Quezaltepeque", "Dulce Nombre de María", "El Carrizal", "El Paraíso", "La Laguna", "La Palma", "La Reina", "Las Vueltas", "Nombre de Jesús", "Nueva Concepción", "Nueva Trinidad", "Ojos de Agua", "Potonico", "San Antonio de la Cruz", "San Antonio Los Ranchos", "San Fernando", "San Francisco Lempa", "San Francisco Morazán", "San Ignacio", "San Isidro Labrador", "San Luis del Carmen", "San Miguel de Mercedes", "San Rafael", "Santa Rita", "Tejutla"],
-  "Cuscatlán": ["Cojutepeque", "Candelaria", "El Carmen", "El Rosario", "Monte San Juan", "Oratorio de Concepción", "San Bartolomé Perulapía", "San Cristóbal", "San José Guayabal", "San Pedro Perulapán", "San Rafael Cedros", "San Ramón", "Santa Cruz Analquito", "Santa Cruz Michapa", "Suchitoto", "Tenancingo"],
-  "La Libertad": ["Santa Tecla", "Antiguo Cuscatlán", "Chiltiupán", "Ciudad Arce", "Colón", "Comasagua", "Huizúcar", "Jayaque", "Jicalapa", "La Libertad", "Nuevo Cuscatlán", "Quezaltepeque", "Sacacoyo", "San José Villanueva", "San Juan Opico", "San Matías", "San Pablo Tacachico", "Tamanique", "Talnique", "Teotepeque", "Tepecoyo", "Zaragoza"],
-  "La Paz": ["Zacatecoluca", "Cuyultitán", "El Rosario", "Jerusalén", "Mercedes La Ceiba", "Olocuilta", "Paraíso de Osorio", "San Antonio Masahuat", "San Emigdio", "San Francisco Chinameca", "San Juan Nonualco", "San Juan Talpa", "San Juan Tepezontes", "San Luis La Herradura", "San Luis Talpa", "San Miguel Tepezontes", "San Pedro Masahuat", "San Pedro Nonualco", "San Rafael Obrajuelo", "Santa María Ostuma", "Santiago Nonualco", "Tapalhuaca"],
-  "La Unión": ["La Unión", "Anamorós", "Bolívar", "Concepción de Oriente", "Conchagua", "El Carmen", "El Sauce", "Intipucá", "Lislique", "Meanguera del Golfo", "Nueva Esparta", "Pasaquina", "Polorós", "San Alejo", "San José", "Santa Rosa de Lima", "Yayantique", "Yucuaiquín"],
-  "Morazán": ["San Francisco Gotera", "Arambala", "Cacaopera", "Chilanga", "Corinto", "Delicias de Concepción", "El Divisadero", "El Rosario", "Gualococti", "Guatajiagua", "Joateca", "Jocoaitique", "Jocoro", "Lolotiquillo", "Meanguera", "Osicala", "Perquín", "San Carlos", "San Fernando", "San Isidro", "San Simón", "Sensembra", "Sociedad", "Torola", "Yamabal", "Yoloaiquín"],
-  "San Miguel": ["San Miguel", "Carolina", "Chapeltique", "Chinameca", "Chirilagua", "Ciudad Barrios", "Comacarán", "El Tránsito", "Lolotique", "Moncagua", "Nueva Guadalupe", "Nuevo Edén de San Juan", "Quelepa", "San Antonio del Mosco", "San Gerardo", "San Jorge", "San Luis de la Reina", "San Rafael Oriente", "Sesori", "Uluazapa"],
-  "San Salvador": ["San Salvador", "Aguilares", "Apopa", "Ayutuxtepeque", "Cuscatancingo", "Delgado", "El Paisnal", "Guazapa", "Ilopango", "Mejicanos", "Nejapa", "Panchimalco", "Rosario de Mora", "San Marcos", "San Martín", "Santiago Texacuangos", "Santo Tomás", "Soyapango", "Tonacatepeque"],
-  "San Vicente": ["San Vicente", "Apastepeque", "Guadalupe", "San Cayetano Istepeque", "San Esteban Catarina", "San Ildefonso", "San Lorenzo", "San Sebastián", "Santa Clara", "Santo Domingo", "Tecoluca", "Tepetitán", "Verapaz"],
-  "Santa Ana": ["Santa Ana", "Candelaria de la Frontera", "Chalchuapa", "Coatepeque", "El Congo", "El Porvenir", "Masahuat", "Metapán", "San Antonio Pajonal", "San Sebastián Salitrillo", "Santa Rosa Guachipilín", "Santiago de la Frontera", "Texistepeque"],
-  "Sonsonate": ["Sonsonate", "Acajutla", "Armenia", "Caluco", "Cuisnahuat", "Izalco", "Juayúa", "Nahuizalco", "Nahulingo", "Salcoatitán", "San Antonio del Monte", "San Julián", "Santa Catarina Masahuat", "Santa Isabel Ishuatán", "Santo Domingo de Guzmán", "Sonzacate"],
-  "Usulután": ["Usulután", "Alegría", "Berlín", "California", "Concepción Batres", "El Triunfo", "Ereguayquín", "Estanzuelas", "Jiquilisco", "Jucuapa", "Jucuarán", "Mercedes Umaña", "Nueva Granada", "Ozatlán", "Puerto El Triunfo", "San Agustín", "San Buenaventura", "San Dionisio", "San Francisco Javier", "Santa Elena", "Santa María", "Santiago de María", "Tecapán"]
+  Ahuachapán: [
+    "Ahuachapán",
+    "Apaneca",
+    "Atiquizaya",
+    "Concepción de Ataco",
+    "El Refugio",
+    "Guaymango",
+    "Jujutla",
+    "San Francisco Menéndez",
+    "San Lorenzo",
+    "San Pedro Puxtla",
+    "Tacuba",
+    "Turín",
+  ],
+  Cabañas: [
+    "Sensuntepeque",
+    "Cinquera",
+    "Dolores",
+    "Guacotecti",
+    "Ilobasco",
+    "Jutiapa",
+    "San Isidro",
+    "Tejutepeque",
+    "Victoria",
+  ],
+  Chalatenango: [
+    "Chalatenango",
+    "Agua Caliente",
+    "Arcatao",
+    "Azacualpa",
+    "Cancasque",
+    "Citalá",
+    "Comalapa",
+    "Concepción Quezaltepeque",
+    "Dulce Nombre de María",
+    "El Carrizal",
+    "El Paraíso",
+    "La Laguna",
+    "La Palma",
+    "La Reina",
+    "Las Vueltas",
+    "Nombre de Jesús",
+    "Nueva Concepción",
+    "Nueva Trinidad",
+    "Ojos de Agua",
+    "Potonico",
+    "San Antonio de la Cruz",
+    "San Antonio Los Ranchos",
+    "San Fernando",
+    "San Francisco Lempa",
+    "San Francisco Morazán",
+    "San Ignacio",
+    "San Isidro Labrador",
+    "San Luis del Carmen",
+    "San Miguel de Mercedes",
+    "San Rafael",
+    "Santa Rita",
+    "Tejutla",
+  ],
+  Cuscatlán: [
+    "Cojutepeque",
+    "Candelaria",
+    "El Carmen",
+    "El Rosario",
+    "Monte San Juan",
+    "Oratorio de Concepción",
+    "San Bartolomé Perulapía",
+    "San Cristóbal",
+    "San José Guayabal",
+    "San Pedro Perulapán",
+    "San Rafael Cedros",
+    "San Ramón",
+    "Santa Cruz Analquito",
+    "Santa Cruz Michapa",
+    "Suchitoto",
+    "Tenancingo",
+  ],
+  "La Libertad": [
+    "Santa Tecla",
+    "Antiguo Cuscatlán",
+    "Chiltiupán",
+    "Ciudad Arce",
+    "Colón",
+    "Comasagua",
+    "Huizúcar",
+    "Jayaque",
+    "Jicalapa",
+    "La Libertad",
+    "Nuevo Cuscatlán",
+    "Quezaltepeque",
+    "Sacacoyo",
+    "San José Villanueva",
+    "San Juan Opico",
+    "San Matías",
+    "San Pablo Tacachico",
+    "Tamanique",
+    "Talnique",
+    "Teotepeque",
+    "Tepecoyo",
+    "Zaragoza",
+  ],
+  "La Paz": [
+    "Zacatecoluca",
+    "Cuyultitán",
+    "El Rosario",
+    "Jerusalén",
+    "Mercedes La Ceiba",
+    "Olocuilta",
+    "Paraíso de Osorio",
+    "San Antonio Masahuat",
+    "San Emigdio",
+    "San Francisco Chinameca",
+    "San Juan Nonualco",
+    "San Juan Talpa",
+    "San Juan Tepezontes",
+    "San Luis La Herradura",
+    "San Luis Talpa",
+    "San Miguel Tepezontes",
+    "San Pedro Masahuat",
+    "San Pedro Nonualco",
+    "San Rafael Obrajuelo",
+    "Santa María Ostuma",
+    "Santiago Nonualco",
+    "Tapalhuaca",
+  ],
+  "La Unión": [
+    "La Unión",
+    "Anamorós",
+    "Bolívar",
+    "Concepción de Oriente",
+    "Conchagua",
+    "El Carmen",
+    "El Sauce",
+    "Intipucá",
+    "Lislique",
+    "Meanguera del Golfo",
+    "Nueva Esparta",
+    "Pasaquina",
+    "Polorós",
+    "San Alejo",
+    "San José",
+    "Santa Rosa de Lima",
+    "Yayantique",
+    "Yucuaiquín",
+  ],
+  Morazán: [
+    "San Francisco Gotera",
+    "Arambala",
+    "Cacaopera",
+    "Chilanga",
+    "Corinto",
+    "Delicias de Concepción",
+    "El Divisadero",
+    "El Rosario",
+    "Gualococti",
+    "Guatajiagua",
+    "Joateca",
+    "Jocoaitique",
+    "Jocoro",
+    "Lolotiquillo",
+    "Meanguera",
+    "Osicala",
+    "Perquín",
+    "San Carlos",
+    "San Fernando",
+    "San Isidro",
+    "San Simón",
+    "Sensembra",
+    "Sociedad",
+    "Torola",
+    "Yamabal",
+    "Yoloaiquín",
+  ],
+  "San Miguel": [
+    "San Miguel",
+    "Carolina",
+    "Chapeltique",
+    "Chinameca",
+    "Chirilagua",
+    "Ciudad Barrios",
+    "Comacarán",
+    "El Tránsito",
+    "Lolotique",
+    "Moncagua",
+    "Nueva Guadalupe",
+    "Nuevo Edén de San Juan",
+    "Quelepa",
+    "San Antonio del Mosco",
+    "San Gerardo",
+    "San Jorge",
+    "San Luis de la Reina",
+    "San Rafael Oriente",
+    "Sesori",
+    "Uluazapa",
+  ],
+  "San Salvador": [
+    "San Salvador",
+    "Aguilares",
+    "Apopa",
+    "Ayutuxtepeque",
+    "Cuscatancingo",
+    "Delgado",
+    "El Paisnal",
+    "Guazapa",
+    "Ilopango",
+    "Mejicanos",
+    "Nejapa",
+    "Panchimalco",
+    "Rosario de Mora",
+    "San Marcos",
+    "San Martín",
+    "Santiago Texacuangos",
+    "Santo Tomás",
+    "Soyapango",
+    "Tonacatepeque",
+  ],
+  "San Vicente": [
+    "San Vicente",
+    "Apastepeque",
+    "Guadalupe",
+    "San Cayetano Istepeque",
+    "San Esteban Catarina",
+    "San Ildefonso",
+    "San Lorenzo",
+    "San Sebastián",
+    "Santa Clara",
+    "Santo Domingo",
+    "Tecoluca",
+    "Tepetitán",
+    "Verapaz",
+  ],
+  "Santa Ana": [
+    "Santa Ana",
+    "Candelaria de la Frontera",
+    "Chalchuapa",
+    "Coatepeque",
+    "El Congo",
+    "El Porvenir",
+    "Masahuat",
+    "Metapán",
+    "San Antonio Pajonal",
+    "San Sebastián Salitrillo",
+    "Santa Rosa Guachipilín",
+    "Santiago de la Frontera",
+    "Texistepeque",
+  ],
+  Sonsonate: [
+    "Sonsonate",
+    "Acajutla",
+    "Armenia",
+    "Caluco",
+    "Cuisnahuat",
+    "Izalco",
+    "Juayúa",
+    "Nahuizalco",
+    "Nahulingo",
+    "Salcoatitán",
+    "San Antonio del Monte",
+    "San Julián",
+    "Santa Catarina Masahuat",
+    "Santa Isabel Ishuatán",
+    "Santo Domingo de Guzmán",
+    "Sonzacate",
+  ],
+  Usulután: [
+    "Usulután",
+    "Alegría",
+    "Berlín",
+    "California",
+    "Concepción Batres",
+    "El Triunfo",
+    "Ereguayquín",
+    "Estanzuelas",
+    "Jiquilisco",
+    "Jucuapa",
+    "Jucuarán",
+    "Mercedes Umaña",
+    "Nueva Granada",
+    "Ozatlán",
+    "Puerto El Triunfo",
+    "San Agustín",
+    "San Buenaventura",
+    "San Dionisio",
+    "San Francisco Javier",
+    "Santa Elena",
+    "Santa María",
+    "Santiago de María",
+    "Tecapán",
+  ],
 };
 
 export default function ChatBot() {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [catalogo, setCatalogo] = useState([]);
   const [encomiendistas, setEncomiendistas] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [loadingEncomiendas, setLoadingEncomiendas] = useState(false);
+
   const [sessionData, setSessionData] = useState({
-    step: 'inicio',
-    nombre: '',
-    telefono: '',
+    step: "inicio",
+    nombre: "",
+    telefono: "",
     carrito: [],
-    departamento: '',
-    municipio: '',
-    direccion: '',
-    punto_referencia: '',
-    tipo_entrega: '',
-    metodo_pago: '',
-    encomiendista: '',
-    encomiendista_nombre: '',
-    encomiendista_telefono: '',
+    departamento: "",
+    municipio: "",
+    direccion: "",
+    punto_referencia: "",
+    tipo_entrega: "",
+    metodo_pago: "",
+    encomiendista: "",
+    encomiendista_nombre: "",
+    encomiendista_telefono: "",
     costo_envio: 0,
-    dia_entrega: '',
-    hora_entrega: ''
+    dia_entrega: "",
+    hora_entrega: "",
+    foto_comprobante_base64: "",
+    factura_generada: "",
   });
+
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [encomiendaIndex, setEncomiendaIndex] = useState(0);
   const [showCarousel, setShowCarousel] = useState(false);
   const [showEncomiendaCarousel, setShowEncomiendaCarousel] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('todos');
-  const [selectedTalla, setSelectedTalla] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState("todos");
+  const [selectedTalla, setSelectedTalla] = useState("");
   const [cantidad, setCantidad] = useState(1);
+
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -65,67 +356,70 @@ export default function ChatBot() {
   }, [messages]);
 
   useEffect(() => {
-    addMessage("¡Hola! 💚 Bienvenido/a a GyS Importadora ✨\n\nPor favor, dime tu NOMBRE COMPLETO:", 'bot');
+    addMessage(
+      "¡Hola! 💚 Bienvenido/a a GyS Importadora ✨\n\nPor favor, dime tu NOMBRE COMPLETO:",
+      "bot"
+    );
   }, []);
 
   const addMessage = (text, sender, options = null) => {
-    setMessages(prev => [...prev, { text, sender, options, timestamp: new Date() }]);
+    setMessages((prev) => [
+      ...prev,
+      { text, sender, options, timestamp: new Date() },
+    ]);
   };
 
-  const cargarCatalogo = async (categoria = '') => {
+  // ---------- CATÁLOGO ----------
+  const cargarCatalogo = async (categoria = "") => {
     setLoadingCatalog(true);
     try {
       let url = `${SCRIPT_URL}?route=catalog&limit=100`;
-      if (categoria && categoria !== 'todos') {
+      if (categoria && categoria !== "todos") {
         url += `&categoria=${categoria}`;
       }
-      
-      const response = await fetch(url);
-      const data = await response.json();
-      
+      const res = await fetch(url);
+      const data = await res.json();
       if (data.error) {
-        addMessage("❌ Error al cargar el catálogo. Intenta de nuevo.", 'bot');
+        addMessage(
+          "❌ Error al cargar el catálogo. Intenta de nuevo.",
+          "bot"
+        );
         setCatalogo([]);
       } else {
         setCatalogo(data.items || []);
         if (data.items && data.items.length > 0) {
-          addMessage(`✨ Encontré ${data.items.length} productos disponibles. Usa las flechas para navegar:`, 'bot');
+          addMessage(
+            `✨ Encontré ${data.items.length} productos disponibles. Usa las flechas para navegar:`,
+            "bot"
+          );
         } else {
-          addMessage("No encontré productos en esta categoría 😔", 'bot');
+          addMessage("No encontré productos en esta categoría 😔", "bot");
         }
       }
-    } catch (error) {
-      addMessage("❌ Error de conexión. Verifica tu internet.", 'bot');
+    } catch (e) {
+      addMessage("❌ Error de conexión. Verifica tu internet.", "bot");
       setCatalogo([]);
     }
     setLoadingCatalog(false);
   };
 
+  // ---------- ENCOMIENDISTAS ----------
   const cargarEncomiendistas = async (tipoEnvio) => {
     setLoadingEncomiendas(true);
     try {
-      const url = `${SCRIPT_URL}?route=encomiendas&tipo_entrega=${encodeURIComponent(tipoEnvio)}`;
-      
-      console.log('🔍 Buscando encomiendistas:', tipoEnvio);
-      console.log('🔗 URL:', url);
-      
-      const response = await fetch(url);
-      const data = await response.json();
-      
-      console.log('📦 Respuesta API:', data);
-      
+      const url = `${SCRIPT_URL}?route=encomiendas&tipo_entrega=${encodeURIComponent(
+        tipoEnvio
+      )}`;
+      const res = await fetch(url);
+      const data = await res.json();
       if (data.error) {
-        console.error('❌ Error en API:', data.message);
         setEncomiendistas([]);
         return { success: false, items: [] };
-      } else {
-        const items = data.items || [];
-        console.log('✅ Items encontrados:', items.length);
-        setEncomiendistas(items);
-        return { success: items.length > 0, items: items };
       }
-    } catch (error) {
-      console.error('❌ Error de red:', error);
+      const items = data.items || [];
+      setEncomiendistas(items);
+      return { success: items.length > 0, items };
+    } catch (e) {
       setEncomiendistas([]);
       return { success: false, items: [] };
     } finally {
@@ -134,98 +428,68 @@ export default function ChatBot() {
   };
 
   const handleEncomiendaNav = (direction) => {
-    if (direction === 'next') {
+    if (direction === "next") {
       setEncomiendaIndex((prev) => (prev + 1) % encomiendistas.length);
     } else {
-      setEncomiendaIndex((prev) => (prev - 1 + encomiendistas.length) % encomiendistas.length);
+      setEncomiendaIndex(
+        (prev) => (prev - 1 + encomiendistas.length) % encomiendistas.length
+      );
     }
   };
 
   const seleccionarEncomienda = () => {
-    const encomiendista = encomiendistas[encomiendaIndex];
-    
-    if (!encomiendista) return;
+    const enc = encomiendistas[encomiendaIndex];
+    if (!enc) return;
 
-    setSessionData(prev => ({ 
-      ...prev, 
-      encomiendista: encomiendista.ID_ENCOMENDISTA,
-      encomiendista_nombre: encomiendista.ENCOMIENDISTA,
-      encomiendista_telefono: encomiendista.TELEFONO_ENCOMIENDISTA,
-      departamento: encomiendista.DEPARTAMENTO,
-      municipio: encomiendista.MUNICIPIO,
-      costo_envio: encomiendista.COSTO_ENVIO,
-      dia_entrega: encomiendista.DIA_ENTREGA || '',
-      hora_entrega: encomiendista.HORA_ENTREGA || '',
-      punto_referencia: encomiendista.PUNTO_REFERENCIA || '',
-      step: 'metodo_pago'
+    setSessionData((prev) => ({
+      ...prev,
+      encomiendista: enc.ID_ENCOMENDISTA,
+      encomiendista_nombre: enc.ENCOMIENDISTA,
+      encomiendista_telefono: enc.TELEFONO_ENCOMIENDISTA,
+      departamento: enc.DEPARTAMENTO,
+      municipio: enc.MUNICIPIO,
+      costo_envio: enc.COSTO_ENVIO,
+      dia_entrega: enc.DIA_ENTREGA || "",
+      hora_entrega: enc.HORA_ENTREGA || "",
+      punto_referencia: enc.PUNTO_REFERENCIA || "",
+      step: "metodo_pago",
     }));
 
     setShowEncomiendaCarousel(false);
 
-    const tipoTexto = sessionData.tipo_entrega === 'PUNTO FIJO' ? 'punto fijo' : 'casillero';
-    addMessage(`✅ Seleccionaste ${tipoTexto}: ${encomiendista.ENCOMIENDISTA}\n📍 ${encomiendista.DEPARTAMENTO} - ${encomiendista.MUNICIPIO}\n🏪 ${encomiendista.PUNTO_REFERENCIA}\n💵 Costo: $${encomiendista.COSTO_ENVIO}\n\n¿Cómo deseas pagar?`, 'bot', [
-      { label: "💵 Contra entrega", value: "contra_entrega" },
-      { label: "💳 Transferencia", value: "transferencia" }
-    ]);
+    const tipoTexto =
+      sessionData.tipo_entrega === "PUNTO FIJO" ? "punto fijo" : "casillero";
+
+    addMessage(
+      `✅ Seleccionaste ${tipoTexto}: ${enc.ENCOMIENDISTA}\n📍 ${enc.DEPARTAMENTO} - ${enc.MUNICIPIO}\n🏪 ${enc.PUNTO_REFERENCIA}\n💵 Costo: $${enc.COSTO_ENVIO}\n\n¿Cómo deseas pagar?`,
+      "bot",
+      [
+        { label: "💵 Contra entrega", value: "contra_entrega" },
+        { label: "💳 Transferencia", value: "transferencia" },
+      ]
+    );
   };
 
+  // ---------- CARRUSEL CATALOGO ----------
   const getFilteredCatalog = () => {
-    if (selectedCategory === 'todos') return catalogo;
-    return catalogo.filter(item => 
-      (item.CATEGORIA || '').toLowerCase().includes(selectedCategory.toLowerCase())
+    if (selectedCategory === "todos") return catalogo;
+    return catalogo.filter((item) =>
+      (item.CATEGORIA || "")
+        .toLowerCase()
+        .includes(selectedCategory.toLowerCase())
     );
   };
 
   const handleCarouselNav = (direction) => {
     const filtered = getFilteredCatalog();
-    if (direction === 'next') {
+    if (!filtered.length) return;
+
+    if (direction === "next") {
       setCarouselIndex((prev) => (prev + 1) % filtered.length);
     } else {
       setCarouselIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
     }
-    setSelectedTalla('');
-    setCantidad(1);
-  };
-
-  const agregarAlCarrito = () => {
-    const filtered = getFilteredCatalog();
-    const currentProduct = filtered[carouselIndex];
-    
-    if (!currentProduct) return;
-    if (!selectedTalla && currentProduct.TALLAS_DISPONIBLES?.length > 0) {
-      addMessage("⚠️ Por favor selecciona una talla", 'bot');
-      return;
-    }
-
-    const precio = calcularPrecio(currentProduct, cantidad);
-    const item = {
-      CODIGO_INTERNO: currentProduct.CODIGO_INTERNO,
-      CODIGO: currentProduct.CODIGO,
-      CATEGORIA: currentProduct.CATEGORIA,
-      DESCRIPCION: currentProduct.DESCRIPCION,
-      TALLA: selectedTalla || currentProduct.TALLA_SIMPLE || 'N/A',
-      COLOR: currentProduct.COLOR,
-      CANTIDAD: cantidad,
-      PRECIO_UNITARIO: currentProduct.PRECIO_UNIDAD,
-      PRECIO_APLICADO: precio,
-      DESCUENTO_POR_CANTIDAD: 0,
-      SUBTOTAL_ITEM: precio * cantidad,
-      FOTO: currentProduct.FOTO || ""
-    };
-
-    setSessionData(prev => ({
-      ...prev,
-      carrito: [...prev.carrito, item]
-    }));
-
-    addMessage(`✅ Agregado: ${item.DESCRIPCION} (${item.TALLA}) x${cantidad} = $${(precio * cantidad).toFixed(2)}`, 'bot');
-    addMessage("¿Qué deseas hacer?", 'bot', [
-      { label: "➕ Agregar más productos", value: "agregar_mas" },
-      { label: "🛒 Ver mi carrito", value: "ver_carrito" },
-      { label: "✅ Continuar con el pedido", value: "continuar_pedido" }
-    ]);
-
-    setSelectedTalla('');
+    setSelectedTalla("");
     setCantidad(1);
   };
 
@@ -237,28 +501,234 @@ export default function ChatBot() {
     return producto.PRECIO_UNIDAD;
   };
 
+  const agregarAlCarrito = () => {
+    const filtered = getFilteredCatalog();
+    const currentProduct = filtered[carouselIndex];
+    if (!currentProduct) return;
+
+    if (!selectedTalla && currentProduct.TALLAS_DISPONIBLES?.length > 0) {
+      addMessage("⚠️ Por favor selecciona una talla", "bot");
+      return;
+    }
+
+    const precio = calcularPrecio(currentProduct, cantidad);
+
+    const item = {
+      CODIGO_INTERNO: currentProduct.CODIGO_INTERNO,
+      CODIGO: currentProduct.CODIGO,
+      CATEGORIA: currentProduct.CATEGORIA,
+      DESCRIPCION: currentProduct.DESCRIPCION,
+      TALLA: selectedTalla || currentProduct.TALLA_SIMPLE || "N/A",
+      COLOR: currentProduct.COLOR,
+      CANTIDAD: cantidad,
+      PRECIO_UNITARIO: currentProduct.PRECIO_UNIDAD,
+      PRECIO_APLICADO: precio,
+      DESCUENTO_POR_CANTIDAD: 0,
+      SUBTOTAL_ITEM: precio * cantidad,
+      FOTO: currentProduct.FOTO || "",
+    };
+
+    setSessionData((prev) => ({
+      ...prev,
+      carrito: [...prev.carrito, item],
+    }));
+
+    addMessage(
+      `✅ Agregado: ${item.DESCRIPCION} (${item.TALLA}) x${cantidad} = $${(
+        precio * cantidad
+      ).toFixed(2)}`,
+      "bot"
+    );
+
+    addMessage("¿Qué deseas hacer?", "bot", [
+      { label: "➕ Agregar más productos", value: "agregar_mas" },
+      { label: "🛒 Ver mi carrito", value: "ver_carrito" },
+      { label: "✅ Continuar con el pedido", value: "continuar_pedido" },
+    ]);
+
+    setSelectedTalla("");
+    setCantidad(1);
+  };
+
   const mostrarCarrito = () => {
     if (sessionData.carrito.length === 0) {
-      addMessage("🛒 Tu carrito está vacío", 'bot');
+      addMessage("🛒 Tu carrito está vacío", "bot");
       return;
     }
 
     let texto = "🛒 *TU CARRITO:*\n\n";
     let subtotal = 0;
-    
+
     sessionData.carrito.forEach((item, idx) => {
       texto += `${idx + 1}. ${item.DESCRIPCION}\n`;
-      texto += `   Talla: ${item.TALLA} | Cant: ${item.CANTIDAD}\n`;
-      texto += `   $${item.PRECIO_APLICADO} x ${item.CANTIDAD} = $${item.SUBTOTAL_ITEM.toFixed(2)}\n\n`;
+      texto += `   Talla: ${item.TALLA} | Cant: ${
+        item.CANTIDAD
+      }\n   $${item.PRECIO_APLICADO} x ${
+        item.CANTIDAD
+      } = $${item.SUBTOTAL_ITEM.toFixed(2)}\n\n`;
       subtotal += item.SUBTOTAL_ITEM;
     });
 
     texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
-    addMessage(texto, 'bot');
+    addMessage(texto, "bot");
   };
 
+  // ---------- RESUMEN ----------
+  const mostrarResumen = () => {
+    const subtotal = sessionData.carrito.reduce(
+      (sum, item) => sum + item.SUBTOTAL_ITEM,
+      0
+    );
+    const total = subtotal + sessionData.costo_envio;
+
+    let resumen = `📋 *RESUMEN DE TU PEDIDO*\n\n`;
+    resumen += `👤 ${sessionData.nombre}\n`;
+    resumen += `📱 ${sessionData.telefono}\n\n`;
+
+    resumen += `📦 *Productos (${sessionData.carrito.length}):*\n`;
+    sessionData.carrito.forEach((item, idx) => {
+      resumen += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA}) x${
+        item.CANTIDAD
+      }\n`;
+    });
+
+    resumen += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
+
+    let tipoEnvioTexto = sessionData.tipo_entrega;
+    if (tipoEnvioTexto === "PERSONALIZADO") tipoEnvioTexto = "🏠 PERSONALIZADO";
+    if (tipoEnvioTexto === "PUNTO FIJO") tipoEnvioTexto = "📍 PUNTO FIJO";
+    if (tipoEnvioTexto === "CASILLERO") tipoEnvioTexto = "📦 CASILLERO";
+
+    resumen += `🚚 Envío (${tipoEnvioTexto}): $${sessionData.costo_envio.toFixed(
+      2
+    )}\n`;
+    resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
+
+    resumen += `📍 ${sessionData.departamento} - ${sessionData.municipio}\n`;
+
+    if (sessionData.tipo_entrega === "PERSONALIZADO") {
+      resumen += `📌 ${sessionData.punto_referencia}\n`;
+    } else {
+      if (sessionData.encomiendista_nombre) {
+        resumen += `🚛 ${sessionData.encomiendista_nombre}\n`;
+      }
+      if (sessionData.punto_referencia) {
+        resumen += `📍 ${sessionData.punto_referencia}\n`;
+      }
+      if (sessionData.dia_entrega) {
+        resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+      }
+    }
+
+    resumen += `💳 ${sessionData.metodo_pago}\n\n`;
+    resumen += `¿Todo correcto?`;
+
+    addMessage(resumen, "bot", [
+      { label: "✅ Confirmar pedido", value: "confirmar_pedido" },
+      { label: "❌ Cancelar", value: "cancelar" },
+    ]);
+  };
+
+  // ---------- SUBIR COMPROBANTE DESPUÉS DE LA FACTURA ----------
+  const subirComprobanteDespuesDeFactura = async (factura) => {
+    if (!sessionData.foto_comprobante_base64) return;
+    try {
+      await fetch(`${SCRIPT_URL}?route=uploadComprobante`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          factura,
+          base64: sessionData.foto_comprobante_base64,
+        }),
+      });
+      addMessage("📤 Tu comprobante fue guardado correctamente ✔️", "bot");
+    } catch (e) {
+      addMessage(
+        "⚠️ No se pudo guardar el comprobante. El asesor lo agregará manualmente.",
+        "bot"
+      );
+    }
+  };
+
+  // ---------- CREAR PEDIDO + COMPROBANTE ----------
+  const crearPedidoConComprobante = async (pedido, subtotal, total) => {
+    try {
+      const res = await fetch(`${SCRIPT_URL}?route=crearPedido`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pedido),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        addMessage(`✅ ¡Pedido #${data.factura} creado exitosamente!`, "bot");
+        setSessionData((prev) => ({
+          ...prev,
+          factura_generada: data.factura,
+        }));
+
+        await subirComprobanteDespuesDeFactura(data.factura);
+      } else {
+        addMessage(
+          "⚠️ Error al guardar en el sistema. Se enviará por WhatsApp.",
+          "bot"
+        );
+      }
+
+      enviarWhatsApp(subtotal, total);
+    } catch (e) {
+      addMessage(
+        "⚠️ No se pudo conectar con el sistema\nEnviando el pedido por WhatsApp...",
+        "bot"
+      );
+      const subtotalLocal = pedido.subtotal;
+      const totalLocal = pedido.total;
+      enviarWhatsApp(subtotalLocal, totalLocal);
+    }
+  };
+
+  // ---------- FILE -> BASE64 ----------
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = String(reader.result).split(",")[1];
+        resolve(base64);
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+    addMessage("📸 Recibiendo comprobante, procesando imagen...", "bot");
+    try {
+      const base64 = await fileToBase64(file);
+      setSessionData((prev) => ({
+        ...prev,
+        foto_comprobante_base64: base64,
+      }));
+      addMessage(
+        "✅ Comprobante recibido.\n\nAhora te muestro el resumen para confirmar tu pedido:",
+        "bot"
+      );
+      setSessionData((prev) => ({ ...prev, step: "confirmar" }));
+      mostrarResumen();
+    } catch (e) {
+      addMessage(
+        "⚠️ Hubo un error leyendo la imagen. Intenta subirla nuevamente.",
+        "bot"
+      );
+    }
+  };
+
+  // ---------- CREAR PEDIDO (LLAMADO DESDE EL FLUJO) ----------
   const crearPedidoEnSheet = async () => {
-    const subtotal = sessionData.carrito.reduce((sum, item) => sum + item.SUBTOTAL_ITEM, 0);
+    const subtotal = sessionData.carrito.reduce(
+      (sum, item) => sum + item.SUBTOTAL_ITEM,
+      0
+    );
     const total = subtotal + sessionData.costo_envio;
 
     const pedido = {
@@ -271,64 +741,49 @@ export default function ChatBot() {
       tipo_entrega: sessionData.tipo_entrega,
       encomiendista: sessionData.encomiendista,
       costo_envio: sessionData.costo_envio,
-      subtotal: subtotal,
+      subtotal,
       descuento: 0,
-      total: total,
-      productos: sessionData.carrito
+      total,
+      productos: sessionData.carrito,
     };
 
-    try {
-      const response = await fetch(`${SCRIPT_URL}?route=crearPedido`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pedido)
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        addMessage(`✅ ¡Pedido #${data.factura} creado exitosamente!`, 'bot');
-      }
-      
-      enviarWhatsApp(subtotal, total);
-    } catch (error) {
-      addMessage("⚠️ Enviando pedido por WhatsApp...", 'bot');
-      enviarWhatsApp(subtotal, total);
-    }
+    await crearPedidoConComprobante(pedido, subtotal, total);
   };
 
+  // ---------- WhatsApp ----------
   const enviarWhatsApp = (subtotal, total) => {
     let mensaje = `🛍️ *NUEVO PEDIDO - GyS Importadora*\n\n`;
     mensaje += `👤 *Cliente:* ${sessionData.nombre}\n`;
     mensaje += `📱 *Teléfono:* ${sessionData.telefono}\n\n`;
-    
+
     mensaje += `📦 *PRODUCTOS:*\n`;
     sessionData.carrito.forEach((item, idx) => {
       mensaje += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
-      mensaje += `   Cant: ${item.CANTIDAD} x $${item.PRECIO_APLICADO} = $${item.SUBTOTAL_ITEM.toFixed(2)}\n`;
+      mensaje += `   Cant: ${item.CANTIDAD} x $${item.PRECIO_APLICADO} = $${item.SUBTOTAL_ITEM.toFixed(
+        2
+      )}\n`;
     });
-    
+
     mensaje += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
-    
-    // Tipo de envío con emoji
+
     let tipoTexto = sessionData.tipo_entrega;
-    if (sessionData.tipo_entrega === 'PERSONALIZADO') tipoTexto = '🏠 PERSONALIZADO';
-    else if (sessionData.tipo_entrega === 'PUNTO FIJO') tipoTexto = '📍 PUNTO FIJO';
-    else if (sessionData.tipo_entrega === 'CASILLERO') tipoTexto = '📦 CASILLERO';
-    
-    mensaje += `🚚 Envío (${tipoTexto}): $${sessionData.costo_envio.toFixed(2)}\n`;
+    if (tipoTexto === "PERSONALIZADO") tipoTexto = "🏠 PERSONALIZADO";
+    if (tipoTexto === "PUNTO FIJO") tipoTexto = "📍 PUNTO FIJO";
+    if (tipoTexto === "CASILLERO") tipoTexto = "📦 CASILLERO";
+
+    mensaje += `🚚 Envío (${tipoTexto}): $${sessionData.costo_envio.toFixed(
+      2
+    )}\n`;
     mensaje += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
-    
+
     mensaje += `📍 *UBICACIÓN:*\n`;
     mensaje += `${sessionData.departamento} - ${sessionData.municipio}\n`;
-    
-    if (sessionData.tipo_entrega === 'PERSONALIZADO') {
-      mensaje += `\n🏠 *ENVÍO PERSONALIZADO*\n`;
+
+    if (sessionData.tipo_entrega === "PERSONALIZADO") {
       if (sessionData.punto_referencia) {
         mensaje += `📌 Punto de referencia: ${sessionData.punto_referencia}\n`;
       }
-    } else if (sessionData.tipo_entrega === 'PUNTO FIJO') {
-      mensaje += `\n📍 *PUNTO FIJO*\n`;
+    } else {
       if (sessionData.encomiendista_nombre) {
         mensaje += `🚛 ${sessionData.encomiendista_nombre}\n`;
       }
@@ -338,329 +793,317 @@ export default function ChatBot() {
       if (sessionData.dia_entrega) {
         mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
       }
-    } else if (sessionData.tipo_entrega === 'CASILLERO') {
-      mensaje += `\n📦 *CASILLERO*\n`;
-      if (sessionData.encomiendista_nombre) {
-        mensaje += `📦 ${sessionData.encomiendista_nombre}\n`;
-      }
-      if (sessionData.punto_referencia) {
-        mensaje += `📍 Ubicación: ${sessionData.punto_referencia}\n`;
-      }
-      if (sessionData.dia_entrega) {
-        mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
-      }
     }
-    
+
     mensaje += `\n💳 *Pago:* ${sessionData.metodo_pago}\n\n`;
     mensaje += `✨ _Pedido desde chatbot automático_`;
 
-    const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(mensaje)}`;
-    
-    addMessage("Abriendo WhatsApp para confirmar tu pedido... 📱", 'bot');
+    const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
+      mensaje
+    )}`;
+
+    addMessage("Abriendo WhatsApp para confirmar tu pedido... 📱", "bot");
     setTimeout(() => {
-      window.open(url, '_blank');
+      window.open(url, "_blank");
     }, 1000);
   };
 
+  // ---------- PROCESAR MENSAJES ----------
   const processMessage = async (userInput) => {
-    addMessage(userInput, 'user');
-    
+    addMessage(userInput, "user");
     const input = userInput.toLowerCase().trim();
     const session = sessionData;
 
-    // PASO: Nombre
-    if (session.step === 'inicio') {
-      const palabras = userInput.trim().split(/\s+/);
-      if (palabras.length >= 2) {
-        setSessionData(prev => ({ ...prev, nombre: userInput.trim(), step: 'telefono' }));
-        addMessage(`Gracias ${userInput.trim()} 😊\n\nAhora, ¿cuál es tu número de teléfono?`, 'bot');
+    // NOMBRE
+    if (session.step === "inicio") {
+      const partes = userInput.trim().split(/\s+/);
+      if (partes.length >= 2) {
+        setSessionData((prev) => ({
+          ...prev,
+          nombre: userInput.trim(),
+          step: "telefono",
+        }));
+        addMessage(
+          `Gracias ${userInput.trim()} 😊\n\nAhora, ¿cuál es tu número de teléfono?`,
+          "bot"
+        );
       } else {
-        addMessage("Por favor, necesito tu nombre completo (nombre y apellido) 😊", 'bot');
+        addMessage(
+          "Por favor, necesito tu nombre completo (nombre y apellido) 😊",
+          "bot"
+        );
       }
       return;
     }
 
-    // PASO: Teléfono
-    if (session.step === 'telefono') {
-      const telefono = userInput.replace(/[^0-9]/g, '');
-      if (telefono.length >= 8) {
-        setSessionData(prev => ({ ...prev, telefono: telefono, step: 'menu' }));
-        addMessage("Perfecto 📱 ¿Qué deseas hacer?", 'bot', [
+    // TELÉFONO
+    if (session.step === "telefono") {
+      const tel = userInput.replace(/[^0-9]/g, "");
+      if (tel.length >= 8) {
+        setSessionData((prev) => ({
+          ...prev,
+          telefono: tel,
+          step: "menu",
+        }));
+        addMessage("Perfecto 📱 ¿Qué deseas hacer?", "bot", [
           { label: "🛍️ Ver catálogo", value: "catalogo" },
-          { label: "👤 Hablar con agente", value: "agente" }
+          { label: "👤 Hablar con agente", value: "agente" },
         ]);
       } else {
-        addMessage("Por favor, ingresa un número de teléfono válido (8 dígitos)", 'bot');
+        addMessage(
+          "Por favor, ingresa un número de teléfono válido (8 dígitos)",
+          "bot"
+        );
       }
       return;
     }
 
-    if (input === 'catalogo') {
+    // MENÚ PRINCIPAL
+    if (input === "catalogo") {
       setShowCarousel(true);
       setCarouselIndex(0);
       cargarCatalogo(selectedCategory);
       return;
     }
 
-    if (input === 'agente') {
+    if (input === "agente") {
       const msg = `Hola, soy ${session.nombre} y necesito ayuda con un pedido`;
-      const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(msg)}`;
-      addMessage("Conectándote con un asesor... 👋", 'bot');
-      setTimeout(() => window.open(url, '_blank'), 1000);
+      const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
+        msg
+      )}`;
+      addMessage("Conectándote con un asesor... 👋", "bot");
+      setTimeout(() => window.open(url, "_blank"), 1000);
       return;
     }
 
-    if (input === 'agregar_mas') {
+    if (input === "agregar_mas") {
       setShowCarousel(true);
       return;
     }
 
-    if (input === 'ver_carrito') {
+    if (input === "ver_carrito") {
       mostrarCarrito();
       return;
     }
 
-    // 🆕 CONTINUAR PEDIDO: Lógica según cantidad
-    if (input === 'continuar_pedido') {
+    // CONTINUAR PEDIDO
+    if (input === "continuar_pedido") {
       if (session.carrito.length === 0) {
-        addMessage("⚠️ Tu carrito está vacío. Agrega productos primero.", 'bot');
+        addMessage(
+          "⚠️ Tu carrito está vacío. Agrega productos primero.",
+          "bot"
+        );
         return;
       }
-      
       setShowCarousel(false);
-      const totalProductos = session.carrito.reduce((sum, item) => sum + item.CANTIDAD, 0);
-
+      const totalProductos = session.carrito.reduce(
+        (sum, item) => sum + item.CANTIDAD,
+        0
+      );
       if (totalProductos >= 3) {
-        // 3+ productos: Solo PERSONALIZADO y CASILLERO (sin PUNTO FIJO)
-        setSessionData(prev => ({ ...prev, step: 'tipo_envio_3mas' }));
-        addMessage("📦 Tienes 3 o más productos\n\n¿Cómo deseas recibir tu pedido?", 'bot', [
-          { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
-          { label: "📦 CASILLERO", value: "tipo_casillero" }
-        ]);
+        setSessionData((prev) => ({ ...prev, step: "tipo_envio_3mas" }));
+        addMessage(
+          "📦 Tienes 3 o más productos\n\n¿Cómo deseas recibir tu pedido?",
+          "bot",
+          [
+            { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
+            { label: "📦 CASILLERO", value: "tipo_casillero" },
+          ]
+        );
       } else {
-        // 1-2 productos: 3 opciones disponibles
-        setSessionData(prev => ({ ...prev, step: 'tipo_envio' }));
-        addMessage("📦 ¿Cómo deseas recibir tu pedido?", 'bot', [
+        setSessionData((prev) => ({ ...prev, step: "tipo_envio" }));
+        addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", [
           { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
           { label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" },
-          { label: "📦 CASILLERO", value: "tipo_casillero" }
+          { label: "📦 CASILLERO", value: "tipo_casillero" },
         ]);
       }
       return;
     }
 
-    // Seleccionar PERSONALIZADO
-    if (input === 'tipo_personalizado') {
-      setSessionData(prev => ({ 
-        ...prev, 
-        tipo_entrega: 'PERSONALIZADO',
-        costo_envio: 3.50,
-        step: 'departamento_personalizado' 
+    // TIPOS DE ENTREGA
+    if (input === "tipo_personalizado") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "PERSONALIZADO",
+        costo_envio: 3.5,
+        step: "departamento_personalizado",
       }));
-      
-      addMessage(`✅ Envío PERSONALIZADO - $3.50\n\n📍 ¿De qué departamento eres?`, 'bot',
-        Object.keys(DEPARTAMENTOS_MUNICIPIOS).map(dep => ({
+      addMessage(
+        "🏠 Envío PERSONALIZADO - $3.50\n\n📍 ¿De qué departamento eres?",
+        "bot",
+        Object.keys(DEPARTAMENTOS_MUNICIPIOS).map((dep) => ({
           label: dep,
-          value: `dep_pers_${dep}`
+          value: `dep_pers_${dep}`,
         }))
       );
       return;
     }
 
-    // Seleccionar PUNTO FIJO
-    if (input === 'tipo_punto_fijo') {
-      setSessionData(prev => ({ 
-        ...prev, 
-        tipo_entrega: 'PUNTO FIJO',
-        step: 'cargando_puntos_fijos'
+    if (input === "tipo_punto_fijo") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "PUNTO FIJO",
+        step: "cargando_puntos_fijos",
       }));
-      
-      addMessage("📍 Buscando puntos fijos disponibles... 🔍", 'bot');
-      
-      const resultado = await cargarEncomiendistas('PUNTO FIJO');
-      
+      addMessage("📍 Buscando puntos fijos disponibles... 🔍", "bot");
+      const resultado = await cargarEncomiendistas("PUNTO FIJO");
       if (resultado.success && resultado.items.length > 0) {
         setEncomiendaIndex(0);
         setShowEncomiendaCarousel(true);
-        addMessage(`✨ Encontré ${resultado.items.length} punto(s) fijo(s) disponible(s).\n\nUsa las flechas para navegar:`, 'bot');
+        addMessage(
+          `✨ Encontré ${resultado.items.length} punto(s) fijo(s) disponible(s).\n\nUsa las flechas para navegar:`,
+          "bot"
+        );
       } else {
-        addMessage("⚠️ No hay puntos fijos disponibles", 'bot', [
-          { label: "🏠 Cambiar a PERSONALIZADO", value: "tipo_personalizado" },
+        addMessage("⚠️ No hay puntos fijos disponibles", "bot", [
+          {
+            label: "🏠 Cambiar a PERSONALIZADO",
+            value: "tipo_personalizado",
+          },
           { label: "📦 Ver CASILLEROS", value: "tipo_casillero" },
-          { label: "📞 Contactar agente", value: "agente" }
+          { label: "📞 Contactar agente", value: "agente" },
         ]);
       }
       return;
     }
 
-    // Seleccionar CASILLERO
-    if (input === 'tipo_casillero') {
-      setSessionData(prev => ({ 
-        ...prev, 
-        tipo_entrega: 'CASILLERO',
-        step: 'cargando_casilleros'
+    if (input === "tipo_casillero") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "CASILLERO",
+        step: "cargando_casilleros",
       }));
-      
-      addMessage("📦 Buscando casilleros disponibles... 🔍", 'bot');
-      
-      const resultado = await cargarEncomiendistas('CASILLERO');
-      
+      addMessage("📦 Buscando casilleros disponibles... 🔍", "bot");
+      const resultado = await cargarEncomiendistas("CASILLERO");
       if (resultado.success && resultado.items.length > 0) {
         setEncomiendaIndex(0);
         setShowEncomiendaCarousel(true);
-        addMessage(`✨ Encontré ${resultado.items.length} casillero(s) disponible(s).\n\nUsa las flechas para navegar:`, 'bot');
+        addMessage(
+          `✨ Encontré ${resultado.items.length} casillero(s) disponible(s).\n\nUsa las flechas para navegar:`,
+          "bot"
+        );
       } else {
-        addMessage("⚠️ No hay casilleros disponibles", 'bot', [
-          { label: "🏠 Cambiar a PERSONALIZADO", value: "tipo_personalizado" },
+        addMessage("⚠️ No hay casilleros disponibles", "bot", [
+          {
+            label: "🏠 Cambiar a PERSONALIZADO",
+            value: "tipo_personalizado",
+          },
           { label: "📍 Ver PUNTOS FIJOS", value: "tipo_punto_fijo" },
-          { label: "📞 Contactar agente", value: "agente" }
+          { label: "📞 Contactar agente", value: "agente" },
         ]);
       }
       return;
     }
 
-    // Departamento PERSONALIZADO
-    if (input.startsWith('dep_pers_')) {
-      const departamentoInput = input.replace('dep_pers_', '');
-      
-      // Buscar el departamento de forma case-insensitive
+    // PERSONALIZADO: DEPARTAMENTO / MUNICIPIO / PUNTO
+    if (input.startsWith("dep_pers_")) {
+      const departamentoInput = input.replace("dep_pers_", "");
       const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
-        key => key.toLowerCase() === departamentoInput.toLowerCase()
+        (k) => k.toLowerCase() === departamentoInput.toLowerCase()
       );
-      
       const departamento = departamentoKey || departamentoInput;
       const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
-      
-      console.log('🔍 Input:', departamentoInput);
-      console.log('🔍 Key encontrada:', departamentoKey);
-      console.log('📍 Municipios:', municipios.length);
-      
-      if (municipios.length === 0) {
-        addMessage(`⚠️ No se encontraron municipios para ${departamentoInput}. Por favor contacta con un agente.`, 'bot', [
-          { label: "📞 Contactar agente", value: "agente" }
-        ]);
+      if (!municipios.length) {
+        addMessage(
+          `⚠️ No se encontraron municipios para ${departamentoInput}.`,
+          "bot",
+          [{ label: "📞 Contactar agente", value: "agente" }]
+        );
         return;
       }
-      
-      setSessionData(prev => ({ ...prev, departamento: departamento, step: 'municipio_personalizado' }));
-      addMessage(`${departamento} 📍\n\n¿De qué municipio?`, 'bot',
-        municipios.map(muni => ({
+      setSessionData((prev) => ({
+        ...prev,
+        departamento,
+        step: "municipio_personalizado",
+      }));
+      addMessage(
+        `${departamento} 📍\n\n¿De qué municipio?`,
+        "bot",
+        municipios.map((muni) => ({
           label: muni,
-          value: `muni_pers_${muni}`
+          value: `muni_pers_${muni}`,
         }))
       );
       return;
     }
 
-    // Municipio PERSONALIZADO
-    if (input.startsWith('muni_pers_')) {
-      const municipio = input.replace('muni_pers_', '');
-      setSessionData(prev => ({ ...prev, municipio: municipio, step: 'punto_referencia_personalizado' }));
-      
-      addMessage(`📍 ${session.departamento} - ${municipio}\n\n¿Cuál es tu punto de referencia para la entrega?\n(Ejemplo: Frente a gasolinera Shell)`, 'bot');
+    if (input.startsWith("muni_pers_")) {
+      const municipio = input.replace("muni_pers_", "");
+      setSessionData((prev) => ({
+        ...prev,
+        municipio,
+        step: "punto_referencia_personalizado",
+      }));
+      addMessage(
+        `📍 ${session.departamento} - ${municipio}\n\n¿Cuál es tu punto de referencia?\n(Ej: Frente a gasolinera Shell)`,
+        "bot"
+      );
       return;
     }
 
-    // Punto de referencia PERSONALIZADO
-    if (session.step === 'punto_referencia_personalizado') {
-      setSessionData(prev => ({ 
-        ...prev, 
+    if (session.step === "punto_referencia_personalizado") {
+      setSessionData((prev) => ({
+        ...prev,
         punto_referencia: userInput.trim(),
         direccion: userInput.trim(),
-        encomiendista: 'PERSONALIZADO',
-        encomiendista_nombre: 'Envío Personalizado',
-        step: 'metodo_pago'
+        encomiendista: "PERSONALIZADO",
+        encomiendista_nombre: "Envío Personalizado",
+        step: "metodo_pago",
       }));
-      
-      addMessage(`✅ Punto de referencia registrado\n💵 Costo de envío: $3.50\n\n¿Cómo deseas pagar?`, 'bot', [
-        { label: "💵 Contra entrega", value: "contra_entrega" },
-        { label: "💳 Transferencia", value: "transferencia" }
-      ]);
+      addMessage(
+        "🏠 Punto de referencia registrado\n💵 Costo de envío: $3.50\n\n¿Cómo deseas pagar?",
+        "bot",
+        [
+          { label: "💵 Contra entrega", value: "contra_entrega" },
+          { label: "💳 Transferencia", value: "transferencia" },
+        ]
+      );
       return;
     }
 
-    // Método de pago
-    if (input === 'contra_entrega') {
-      setSessionData(prev => ({ ...prev, metodo_pago: 'Contra entrega', step: 'confirmar' }));
+    // MÉTODO DE PAGO
+    if (input === "contra_entrega") {
+      setSessionData((prev) => ({
+        ...prev,
+        metodo_pago: "Contra entrega",
+        foto_comprobante_base64: "",
+        step: "confirmar",
+      }));
       mostrarResumen();
       return;
     }
 
-    if (input === 'transferencia') {
-      setSessionData(prev => ({ ...prev, metodo_pago: 'Transferencia', step: 'confirmar' }));
-      mostrarResumen();
+    if (input === "transferencia") {
+      setSessionData((prev) => ({
+        ...prev,
+        metodo_pago: "Transferencia",
+        step: "esperando_comprobante",
+      }));
+      addMessage(
+        "💳 Has elegido *Transferencia*.\n\n📸 Ahora sube la *foto del comprobante* usando el botón 📷 de abajo.",
+        "bot"
+      );
       return;
     }
 
-    if (input === 'confirmar_pedido') {
-      crearPedidoEnSheet();
+    if (input === "confirmar_pedido") {
+      await crearPedidoEnSheet();
       return;
     }
 
-    addMessage("No entendí esa opción 😅 Usa los botones disponibles.", 'bot');
-  };
-
-  const mostrarResumen = () => {
-    const subtotal = sessionData.carrito.reduce((sum, item) => sum + item.SUBTOTAL_ITEM, 0);
-    const total = subtotal + sessionData.costo_envio;
-
-    let resumen = `📋 *RESUMEN DE TU PEDIDO*\n\n`;
-    resumen += `👤 ${sessionData.nombre}\n`;
-    resumen += `📱 ${sessionData.telefono}\n\n`;
-    
-    resumen += `📦 *Productos (${sessionData.carrito.length}):*\n`;
-    sessionData.carrito.forEach((item, idx) => {
-      resumen += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA}) x${item.CANTIDAD}\n`;
-    });
-    
-    resumen += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
-    
-    // Mostrar tipo de envío con emoji
-    let tipoEnvioTexto = sessionData.tipo_entrega;
-    if (sessionData.tipo_entrega === 'PERSONALIZADO') {
-      tipoEnvioTexto = '🏠 PERSONALIZADO';
-    } else if (sessionData.tipo_entrega === 'PUNTO FIJO') {
-      tipoEnvioTexto = '📍 PUNTO FIJO';
-    } else if (sessionData.tipo_entrega === 'CASILLERO') {
-      tipoEnvioTexto = '📦 CASILLERO';
+    if (input === "cancelar") {
+      addMessage("❌ Pedido cancelado. Si deseas, puedes empezar de nuevo.", "bot");
+      return;
     }
-    
-    resumen += `🚚 Envío (${tipoEnvioTexto}): $${sessionData.costo_envio.toFixed(2)}\n`;
-    resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
-    
-    resumen += `📍 ${sessionData.departamento} - ${sessionData.municipio}\n`;
-    
-    if (sessionData.tipo_entrega === 'PERSONALIZADO') {
-      if (sessionData.punto_referencia) {
-        resumen += `📌 ${sessionData.punto_referencia}\n`;
-      }
-    } else {
-      // PUNTO FIJO o CASILLERO
-      if (sessionData.encomiendista_nombre) {
-        resumen += `🚛 ${sessionData.encomiendista_nombre}\n`;
-      }
-      if (sessionData.punto_referencia) {
-        resumen += `📍 ${sessionData.punto_referencia}\n`;
-      }
-      if (sessionData.dia_entrega) {
-        resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
-      }
-    }
-    
-    resumen += `💳 ${sessionData.metodo_pago}\n\n`;
-    resumen += `¿Todo correcto?`;
 
-    addMessage(resumen, 'bot', [
-      { label: "✅ Confirmar pedido", value: "confirmar_pedido" },
-      { label: "❌ Cancelar", value: "cancelar" }
-    ]);
+    addMessage("No entendí esa opción 😅 Usa los botones disponibles.", "bot");
   };
 
   const handleSend = () => {
-    if (input.trim()) {
-      processMessage(input);
-      setInput('');
-    }
+    if (!input.trim()) return;
+    processMessage(input);
+    setInput("");
   };
 
   const handleOptionClick = (value) => {
@@ -691,50 +1134,39 @@ export default function ChatBot() {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-4xl mx-auto w-full">
         {messages.map((msg, idx) => (
-          <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] ${msg.sender === 'user' ? 'bg-purple-500 text-white' : 'bg-white text-gray-800'} rounded-2xl px-4 py-3 shadow-md`}>
+          <div
+            key={idx}
+            className={`flex ${
+              msg.sender === "user" ? "justify-end" : "justify-start"
+            }`}
+          >
+            <div
+              className={`max-w-[80%] ${
+                msg.sender === "user"
+                  ? "bg-purple-500 text-white"
+                  : "bg-white text-gray-800"
+              } rounded-2xl px-4 py-3 shadow-md`}
+            >
               <p className="whitespace-pre-wrap">{msg.text}</p>
               {msg.options && (
-                <div className={`mt-3 ${msg.options.length > 6 ? 'max-h-96 overflow-y-auto' : ''}`}>
-                  <div className={`grid ${msg.options.length > 6 ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+                <div
+                  className={`mt-3 ${
+                    msg.options.length > 6 ? "max-h-96 overflow-y-auto" : ""
+                  }`}
+                >
+                  <div
+                    className={`grid ${
+                      msg.options.length > 6 ? "grid-cols-2" : "grid-cols-1"
+                    } gap-2`}
+                  >
                     {msg.options.map((opt, i) => (
-                      <div key={i}>
-                        <button
-                          onClick={() => handleOptionClick(opt.value)}
-                          className="w-full bg-gradient-to-r from-pink-400 to-purple-500 text-white px-4 py-2 rounded-lg hover:from-pink-500 hover:to-purple-600 transition-all text-sm font-medium text-left"
-                        >
-                          {opt.label}
-                        </button>
-                        {opt.extra && (
-                          <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            {opt.extra.foto && (
-                              <img 
-                                src={opt.extra.foto} 
-                                alt={opt.label}
-                                className="w-full h-32 object-cover rounded-lg mb-2"
-                                onError={(e) => e.target.style.display = 'none'}
-                              />
-                            )}
-                            <div className="space-y-1 text-xs text-gray-600">
-                              {opt.extra.punto && (
-                                <p className="flex items-center gap-1">
-                                  <MapPin className="w-3 h-3" /> {opt.extra.punto}
-                                </p>
-                              )}
-                              {opt.extra.costo !== undefined && (
-                                <p className="flex items-center gap-1 font-semibold text-purple-600">
-                                  <DollarSign className="w-3 h-3" /> ${opt.extra.costo}
-                                </p>
-                              )}
-                              {opt.extra.dia && (
-                                <p className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" /> {opt.extra.dia} | {opt.extra.hora}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <button
+                        key={i}
+                        onClick={() => handleOptionClick(opt.value)}
+                        className="w-full bg-gradient-to-r from-pink-400 to-purple-500 text-white px-4 py-2 rounded-lg hover:from-pink-500 hover:to-purple-600 transition-all text-sm font-medium text-left"
+                      >
+                        {opt.label}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -751,12 +1183,12 @@ export default function ChatBot() {
             </div>
           </div>
         )}
-        
+
         {showCarousel && (
           <div className="bg-white rounded-xl shadow-lg p-4 mx-auto max-w-md">
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-bold text-lg">🛍️ Catálogo</h3>
-              <select 
+              <select
                 value={selectedCategory}
                 onChange={(e) => {
                   setSelectedCategory(e.target.value);
@@ -771,63 +1203,84 @@ export default function ChatBot() {
                 <option value="zapatos">Zapatos</option>
               </select>
             </div>
-            
+
             {loadingCatalog ? (
               <div className="flex justify-center items-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
               </div>
             ) : currentProduct ? (
               <div className="relative">
-                <img 
+                <img
                   src={(() => {
-                    let url = currentProduct?.FOTO || currentProduct?.["FOTO LINK"] || 'https://via.placeholder.com/300';
-                    if (url.includes('drive.google.com/uc?export=view')) {
-                      const id = url.split('id=')[1];
-                      url = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
+                    let url =
+                      currentProduct.FOTO ||
+                      currentProduct["FOTO LINK"] ||
+                      "https://via.placeholder.com/300";
+                    if (url.includes("drive.google.com/uc?export=view")) {
+                      const id = url.split("id=")[1];
+                      if (id) {
+                        url = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
+                      }
                     }
                     return url;
                   })()}
                   alt={currentProduct.DESCRIPCION}
                   className="w-full h-64 object-cover rounded-lg mb-3"
-                  onError={(e) => e.target.src = 'https://via.placeholder.com/300?text=Sin+Imagen'}
+                  onError={(e) => {
+                    e.target.src =
+                      "https://via.placeholder.com/300?text=Sin+Imagen";
+                  }}
                 />
-                
+
                 <div className="space-y-3">
-                  <h4 className="font-semibold text-lg capitalize">{currentProduct.DESCRIPCION}</h4>
+                  <h4 className="font-semibold text-lg capitalize">
+                    {currentProduct.DESCRIPCION}
+                  </h4>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Color: {currentProduct.COLOR}</span>
-                    <span className="font-bold text-purple-600 text-lg">${currentProduct.PRECIO_UNIDAD}</span>
+                    <span className="text-gray-600">
+                      Color: {currentProduct.COLOR}
+                    </span>
+                    <span className="font-bold text-purple-600 text-lg">
+                      ${currentProduct.PRECIO_UNIDAD}
+                    </span>
                   </div>
-                  
-                  {currentProduct.TALLAS_DISPONIBLES && currentProduct.TALLAS_DISPONIBLES.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Talla:</label>
-                      <select
-                        value={selectedTalla}
-                        onChange={(e) => setSelectedTalla(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg"
-                      >
-                        <option value="">Selecciona talla</option>
-                        {currentProduct.TALLAS_DISPONIBLES.map((t, i) => (
-                          <option key={i} value={t.etiqueta}>
-                            {t.etiqueta} (Stock: {t.stock})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  
+
+                  {currentProduct.TALLAS_DISPONIBLES &&
+                    currentProduct.TALLAS_DISPONIBLES.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Talla:
+                        </label>
+                        <select
+                          value={selectedTalla}
+                          onChange={(e) => setSelectedTalla(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg"
+                        >
+                          <option value="">Selecciona talla</option>
+                          {currentProduct.TALLAS_DISPONIBLES.map((t, i) => (
+                            <option key={i} value={t.etiqueta}>
+                              {t.etiqueta} (Stock: {t.stock})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                   <div>
-                    <label className="block text-sm font-medium mb-2">Cantidad:</label>
+                    <label className="block text-sm font-medium mb-2">
+                      Cantidad:
+                    </label>
                     <input
                       type="number"
                       min="1"
                       value={cantidad}
-                      onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
+                      onChange={(e) =>
+                        setCantidad(parseInt(e.target.value) || 1)
+                      }
                       className="w-full px-3 py-2 border rounded-lg"
                     />
                   </div>
-                  
+
                   <button
                     onClick={agregarAlCarrito}
                     className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
@@ -838,18 +1291,18 @@ export default function ChatBot() {
                 </div>
 
                 <button
-                  onClick={() => handleCarouselNav('prev')}
+                  onClick={() => handleCarouselNav("prev")}
                   className="absolute left-2 top-28 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
                 >
                   <ChevronLeft className="w-6 h-6" />
                 </button>
                 <button
-                  onClick={() => handleCarouselNav('next')}
+                  onClick={() => handleCarouselNav("next")}
                   className="absolute right-2 top-28 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
                 >
                   <ChevronRight className="w-6 h-6" />
                 </button>
-                
+
                 <div className="text-center text-sm text-gray-500 mt-2">
                   {carouselIndex + 1} / {filtered.length}
                 </div>
@@ -866,72 +1319,76 @@ export default function ChatBot() {
           <div className="bg-white rounded-xl shadow-lg p-4 mx-auto max-w-md">
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-bold text-lg">
-                {sessionData.tipo_entrega === 'PUNTO FIJO' ? '📍 Puntos Fijos' : '📦 Casilleros'}
+                {sessionData.tipo_entrega === "PUNTO FIJO"
+                  ? "📍 Puntos Fijos"
+                  : "📦 Casilleros"}
               </h3>
             </div>
-            
             {(() => {
-              const currentEnc = encomiendistas[encomiendaIndex];
-              if (!currentEnc) return null;
-              
-              // Convertir URL de Google Drive si es necesario
-              let fotoUrl = currentEnc.FOTO_REFERENCIA || '';
-              if (fotoUrl.includes('drive.google.com/uc?export=view')) {
-                const id = fotoUrl.split('id=')[1];
+              const enc = encomiendistas[encomiendaIndex];
+              if (!enc) return null;
+
+              let fotoUrl = enc.FOTO_REFERENCIA || "";
+              if (fotoUrl.includes("drive.google.com/uc?export=view")) {
+                const id = fotoUrl.split("id=")[1];
                 if (id) {
                   fotoUrl = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
                 }
               }
-              
+
               return (
                 <div className="relative">
                   {fotoUrl && (
-                    <img 
+                    <img
                       src={fotoUrl}
-                      alt={currentEnc.ENCOMIENDISTA}
+                      alt={enc.ENCOMIENDISTA}
                       className="w-full h-48 object-cover rounded-lg mb-3"
                       onError={(e) => {
-                        console.error('Error cargando imagen:', fotoUrl);
-                        e.target.src = 'https://via.placeholder.com/300?text=Sin+Foto';
+                        e.target.src =
+                          "https://via.placeholder.com/300?text=Sin+Foto";
                       }}
                     />
                   )}
-                  
+
                   <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-bold text-xl text-purple-600">{currentEnc.ENCOMIENDISTA}</h4>
-                    
+                    <h4 className="font-bold text-xl text-purple-600">
+                      {enc.ENCOMIENDISTA}
+                    </h4>
+
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-gray-500" />
-                        <span className="font-semibold">{currentEnc.DEPARTAMENTO} - {currentEnc.MUNICIPIO}</span>
+                        <span className="font-semibold">
+                          {enc.DEPARTAMENTO} - {enc.MUNICIPIO}
+                        </span>
                       </div>
-                      
-                      {currentEnc.PUNTO_REFERENCIA && (
+                      {enc.PUNTO_REFERENCIA && (
                         <div className="flex items-start gap-2">
                           <Package className="w-4 h-4 text-gray-500 mt-0.5" />
-                          <span>{currentEnc.PUNTO_REFERENCIA}</span>
+                          <span>{enc.PUNTO_REFERENCIA}</span>
                         </div>
                       )}
-                      
                       <div className="flex items-center gap-2">
                         <DollarSign className="w-4 h-4 text-green-600" />
-                        <span className="font-bold text-green-600 text-lg">${currentEnc.COSTO_ENVIO}</span>
+                        <span className="font-bold text-green-600 text-lg">
+                          ${enc.COSTO_ENVIO}
+                        </span>
                       </div>
-                      
-                      {currentEnc.DIA_ENTREGA && (
+                      {enc.DIA_ENTREGA && (
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-gray-500" />
-                          <span>{currentEnc.DIA_ENTREGA}</span>
+                          <span>{enc.DIA_ENTREGA}</span>
                         </div>
                       )}
-                      
-                      {currentEnc.HORA_ENTREGA && (
+                      {enc.HORA_ENTREGA && (
                         <div className="flex items-center gap-2 ml-6">
-                          <span className="text-gray-600">⏰ {currentEnc.HORA_ENTREGA}</span>
+                          <span className="text-gray-600">
+                            ⏰ {enc.HORA_ENTREGA}
+                          </span>
                         </div>
                       )}
                     </div>
-                    
+
                     <button
                       onClick={seleccionarEncomienda}
                       className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 mt-4"
@@ -942,18 +1399,18 @@ export default function ChatBot() {
                   </div>
 
                   <button
-                    onClick={() => handleEncomiendaNav('prev')}
+                    onClick={() => handleEncomiendaNav("prev")}
                     className="absolute left-2 top-20 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
                   <button
-                    onClick={() => handleEncomiendaNav('next')}
+                    onClick={() => handleEncomiendaNav("next")}
                     className="absolute right-2 top-20 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
                   >
                     <ChevronRight className="w-6 h-6" />
                   </button>
-                  
+
                   <div className="text-center text-sm text-gray-500 mt-2">
                     Opción {encomiendaIndex + 1} de {encomiendistas.length}
                   </div>
@@ -962,20 +1419,40 @@ export default function ChatBot() {
             })()}
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 
       <div className="bg-white border-t p-4 shadow-lg">
-        <div className="max-w-4xl mx-auto flex gap-2">
+        <div className="max-w-4xl mx-auto flex gap-2 items-center">
+          {/* INPUT DE TEXTO */}
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Escribe tu mensaje..."
             className="flex-1 px-4 py-3 border-2 border-purple-200 rounded-full focus:outline-none focus:border-purple-500"
           />
+
+          {/* INPUT DE ARCHIVO OCULTO */}
+          <input
+            id="fileInput"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleFileUpload(e.target.files[0])}
+          />
+
+          {/* BOTÓN CÁMARA */}
+          <label
+            htmlFor="fileInput"
+            className="bg-purple-500 text-white p-3 rounded-full cursor-pointer hover:bg-purple-600 transition-all"
+          >
+            📷
+          </label>
+
+          {/* BOTÓN ENVIAR TEXTO */}
           <button
             onClick={handleSend}
             className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-3 rounded-full hover:from-pink-600 hover:to-purple-700 transition-all"
