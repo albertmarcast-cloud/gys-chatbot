@@ -106,20 +106,28 @@ export default function ChatBot() {
     try {
       const url = `${SCRIPT_URL}?route=encomiendas&tipo_entrega=${encodeURIComponent(tipoEnvio)}`;
       
+      console.log('🔍 Buscando encomiendistas:', tipoEnvio);
+      console.log('🔗 URL:', url);
+      
       const response = await fetch(url);
       const data = await response.json();
       
+      console.log('📦 Respuesta API:', data);
+      
       if (data.error) {
+        console.error('❌ Error en API:', data.message);
         setEncomiendistas([]);
-        return false;
+        return { success: false, items: [] };
       } else {
         const items = data.items || [];
+        console.log('✅ Items encontrados:', items.length);
         setEncomiendistas(items);
-        return items.length > 0;
+        return { success: items.length > 0, items: items };
       }
     } catch (error) {
+      console.error('❌ Error de red:', error);
       setEncomiendistas([]);
-      return false;
+      return { success: false, items: [] };
     } finally {
       setLoadingEncomiendas(false);
     }
@@ -469,12 +477,12 @@ export default function ChatBot() {
       
       addMessage("📍 Buscando puntos fijos disponibles... 🔍", 'bot');
       
-      const hayPuntos = await cargarEncomiendistas('PUNTO FIJO');
+      const resultado = await cargarEncomiendistas('PUNTO FIJO');
       
-      if (hayPuntos) {
+      if (resultado.success && resultado.items.length > 0) {
         setEncomiendaIndex(0);
         setShowEncomiendaCarousel(true);
-        addMessage(`✨ Encontré ${encomiendistas.length} puntos fijos disponibles.\n\nUsa las flechas para navegar:`, 'bot');
+        addMessage(`✨ Encontré ${resultado.items.length} punto(s) fijo(s) disponible(s).\n\nUsa las flechas para navegar:`, 'bot');
       } else {
         addMessage("⚠️ No hay puntos fijos disponibles", 'bot', [
           { label: "🏠 Cambiar a PERSONALIZADO", value: "tipo_personalizado" },
@@ -495,12 +503,12 @@ export default function ChatBot() {
       
       addMessage("📦 Buscando casilleros disponibles... 🔍", 'bot');
       
-      const hayCasilleros = await cargarEncomiendistas('CASILLERO');
+      const resultado = await cargarEncomiendistas('CASILLERO');
       
-      if (hayCasilleros) {
+      if (resultado.success && resultado.items.length > 0) {
         setEncomiendaIndex(0);
         setShowEncomiendaCarousel(true);
-        addMessage(`✨ Encontré ${encomiendistas.length} casilleros disponibles.\n\nUsa las flechas para navegar:`, 'bot');
+        addMessage(`✨ Encontré ${resultado.items.length} casillero(s) disponible(s).\n\nUsa las flechas para navegar:`, 'bot');
       } else {
         addMessage("⚠️ No hay casilleros disponibles", 'bot', [
           { label: "🏠 Cambiar a PERSONALIZADO", value: "tipo_personalizado" },
@@ -864,14 +872,28 @@ export default function ChatBot() {
             
             {(() => {
               const currentEnc = encomiendistas[encomiendaIndex];
+              if (!currentEnc) return null;
+              
+              // Convertir URL de Google Drive si es necesario
+              let fotoUrl = currentEnc.FOTO_REFERENCIA || '';
+              if (fotoUrl.includes('drive.google.com/uc?export=view')) {
+                const id = fotoUrl.split('id=')[1];
+                if (id) {
+                  fotoUrl = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
+                }
+              }
+              
               return (
                 <div className="relative">
-                  {currentEnc.FOTO_REFERENCIA && (
+                  {fotoUrl && (
                     <img 
-                      src={currentEnc.FOTO_REFERENCIA}
+                      src={fotoUrl}
                       alt={currentEnc.ENCOMIENDISTA}
                       className="w-full h-48 object-cover rounded-lg mb-3"
-                      onError={(e) => e.target.src = 'https://via.placeholder.com/300?text=Sin+Foto'}
+                      onError={(e) => {
+                        console.error('Error cargando imagen:', fotoUrl);
+                        e.target.src = 'https://via.placeholder.com/300?text=Sin+Foto';
+                      }}
                     />
                   )}
                   
