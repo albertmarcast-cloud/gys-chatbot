@@ -1084,11 +1084,42 @@ export default function ChatBot() {
         step: "esperando_comprobante",
       }));
       addMessage(
-        "💳 Has elegido *Transferencia*.\n\n📸 Ahora sube la *foto del comprobante* usando el botón 📷 de abajo.",
-        "bot"
-      );
-      return;
-    }
+  "💳 Has elegido *Transferencia*.\n\n📸 Ahora sube la *foto del comprobante* usando el botón 📷 de abajo.",
+  "bot"
+);
+// 🔥 AGREGAR ESTO AQUÍ 🔥
+addMessage({
+   type: "quick_replies",
+   text: "¿Qué deseas hacer?",
+   replies: [
+     {
+       title: "📸 Subir comprobante",
+       payload: "subir_comprobante"
+     },
+     {
+       title: "⌛ Enviar después",
+       payload: "omitir_comprobante"
+     }
+   ]
+});
+return;
+} 
+    
+// 🟣 Manejo del botón "Subir comprobante"
+if (input === "subir_comprobante") {
+    addMessage("📸 Perfecto, sube la *foto del comprobante* usando el botón de cámara 📷.", "bot");
+    sessionData.esperando_comprobante = true;
+    return;
+}
+
+// 🔵 Manejo del botón "Enviar después"
+if (input === "omitir_comprobante") {
+    addMessage("⏳ Está bien, puedes enviarlo después. Procederé a crear tu pedido…", "bot");
+    sessionData.foto_comprobante = "";
+    await crearPedidoEnSheet();
+    return;
+}
+
 
     if (input === "confirmar_pedido") {
       await crearPedidoEnSheet();
