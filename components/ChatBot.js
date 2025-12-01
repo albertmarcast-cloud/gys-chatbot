@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, ShoppingBag, Package, ChevronLeft, ChevronRight, Loader2, Truck, MapPin, Clock, DollarSign } from 'lucide-react';
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOHi4qZyxwvdGy826isCABC7JQqeEGvZ8kFT9FzbVi_s5NYKFkHZFVrtoQB6r9NpM/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyhpe-wKBN55gNfw1FYX0F9hRidmfSVkb_rcxr9_v9-5vm49CPZU65185NrtYeh_NMW/exec";
 const WHATSAPP_NEGOCIO = "50375936319";
 
 // Departamentos y municipios de El Salvador
