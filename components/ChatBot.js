@@ -12,10 +12,14 @@ import {
   DollarSign,
 } from "lucide-react";
 
+// URL de tu Apps Script
 const SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbyhpe-wKBN55gNfw1FYX0F9hRidmfSVkb_rcxr9_v9-5vm49CPZU65185NrtYeh_NMW/exec";
+
+// WhatsApp del negocio
 const WHATSAPP_NEGOCIO = "50375936319";
 
+// Departamentos y municipios
 const DEPARTAMENTOS_MUNICIPIOS = {
   Ahuachapán: [
     "Ahuachapán",
@@ -308,6 +312,9 @@ const DEPARTAMENTOS_MUNICIPIOS = {
   ],
 };
 
+// ======================
+//  COMPONENTE PRINCIPAL
+// ======================
 export default function ChatBot() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -369,21 +376,21 @@ export default function ChatBot() {
     ]);
   };
 
-  // ---------- CATÁLOGO ----------
+  // ===================================
+  //     CARGAR CATÁLOGO DESDE SCRIPT
+  // ===================================
   const cargarCatalogo = async (categoria = "") => {
     setLoadingCatalog(true);
     try {
       let url = `${SCRIPT_URL}?route=catalog&limit=100`;
       if (categoria && categoria !== "todos") {
-        url += `&categoria=${categoria}`;
+        url += `&categoria=${encodeURIComponent(categoria)}`;
       }
       const res = await fetch(url);
       const data = await res.json();
+
       if (data.error) {
-        addMessage(
-          "❌ Error al cargar el catálogo. Intenta de nuevo.",
-          "bot"
-        );
+        addMessage("❌ Error al cargar el catálogo. Intenta de nuevo.", "bot");
         setCatalogo([]);
       } else {
         setCatalogo(data.items || []);
@@ -403,7 +410,9 @@ export default function ChatBot() {
     setLoadingCatalog(false);
   };
 
-  // ---------- ENCOMIENDISTAS ----------
+  // ===================================
+  //   CARGAR ENCOMIENDISTAS DESDE SCRIPT
+  // ===================================
   const cargarEncomiendistas = async (tipoEnvio) => {
     setLoadingEncomiendas(true);
     try {
@@ -412,10 +421,12 @@ export default function ChatBot() {
       )}`;
       const res = await fetch(url);
       const data = await res.json();
+
       if (data.error) {
         setEncomiendistas([]);
         return { success: false, items: [] };
       }
+
       const items = data.items || [];
       setEncomiendistas(items);
       return { success: items.length > 0, items };
@@ -427,7 +438,11 @@ export default function ChatBot() {
     }
   };
 
+  // ===================================
+  //      NAVEGAR ENTRE ENCOMIENDISTAS
+  // ===================================
   const handleEncomiendaNav = (direction) => {
+    if (!encomiendistas.length) return;
     if (direction === "next") {
       setEncomiendaIndex((prev) => (prev + 1) % encomiendistas.length);
     } else {
@@ -437,13 +452,16 @@ export default function ChatBot() {
     }
   };
 
+  // ===================================
+  //       SELECCIONAR ENCOMIENDISTA
+  // ===================================
   const seleccionarEncomienda = () => {
     const enc = encomiendistas[encomiendaIndex];
     if (!enc) return;
 
     setSessionData((prev) => ({
       ...prev,
-      encomiendista: enc.ID_ENCOMENDISTA,
+      encomiendista: enc.ID_ENCOMIENDISTA,
       encomiendista_nombre: enc.ENCOMIENDISTA,
       encomiendista_telefono: enc.TELEFONO_ENCOMIENDISTA,
       departamento: enc.DEPARTAMENTO,
@@ -470,7 +488,9 @@ export default function ChatBot() {
     );
   };
 
-  // ---------- CARRUSEL CATALOGO ----------
+  // ===================================
+  //   FILTRAR CATÁLOGO POR CATEGORÍA
+  // ===================================
   const getFilteredCatalog = () => {
     if (selectedCategory === "todos") return catalogo;
     return catalogo.filter((item) =>
@@ -480,6 +500,9 @@ export default function ChatBot() {
     );
   };
 
+  // ===================================
+  //      CARRUSEL DE PRODUCTOS
+  // ===================================
   const handleCarouselNav = (direction) => {
     const filtered = getFilteredCatalog();
     if (!filtered.length) return;
@@ -489,11 +512,15 @@ export default function ChatBot() {
     } else {
       setCarouselIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
     }
+
     setSelectedTalla("");
     setCantidad(1);
   };
 
-  const calcularPrecio = (producto, cant) => {
+  // ===================================
+  //   PRECIO BÁSICO (CATÁLOGO PREVIEW)
+  // ===================================
+  const calcularPrecioPreview = (producto, cant) => {
     if (cant >= 30) return producto.PRECIO_CAJA_MAYOR30 || producto.PRECIO_UNIDAD;
     if (cant >= 12) return producto.PRECIO_DOCENA || producto.PRECIO_UNIDAD;
     if (cant >= 6) return producto.PRECIO_MEDIADOCENA || producto.PRECIO_UNIDAD;
@@ -501,6 +528,41 @@ export default function ChatBot() {
     return producto.PRECIO_UNIDAD;
   };
 
+  // ===================================
+  //   PRECIO POR ITEM (CON TRANSFERENCIA)
+  // ===================================
+  const calcularPrecioItem = (item, metodoPago) => {
+    const cant = Number(item.CANTIDAD || 1);
+    const esTransferencia = metodoPago === "Transferencia";
+
+    const baseUnidad = Number(item.PRECIO_UNIDAD || 0);
+    const basePar = Number(item.PRECIO_PAR || baseUnidad);
+    const baseMedia = Number(item.PRECIO_MEDIADOCENA || baseUnidad);
+    const baseDocena = Number(item.PRECIO_DOCENA || baseUnidad);
+    const baseCaja = Number(item.PRECIO_CAJA_MAYOR30 || baseUnidad);
+
+    const depoUnidad = Number(item.PRECIO_UNIDAD_DEPOSITO || baseUnidad);
+    const depoPar = Number(item.PRECIO_PAR_DEPOSITO || depoUnidad);
+    const depoMedia = Number(item.PRECIO_MEDIADOCENA_DEPOSITO || depoUnidad);
+    const depoDocena = Number(item.PRECIO_DOCENA_DEPOSITO || depoUnidad);
+    const depoCaja = Number(item.PRECIO_CAJA_MAYOR30_DEPOSITO || depoUnidad);
+
+    const precioUnidad = esTransferencia ? depoUnidad : baseUnidad;
+    const precioPar = esTransferencia ? depoPar : basePar;
+    const precioMedia = esTransferencia ? depoMedia : baseMedia;
+    const precioDocena = esTransferencia ? depoDocena : baseDocena;
+    const precioCaja = esTransferencia ? depoCaja : baseCaja;
+
+    if (cant >= 30) return precioCaja || precioUnidad;
+    if (cant >= 12) return precioDocena || precioUnidad;
+    if (cant >= 6) return precioMedia || precioUnidad;
+    if (cant >= 2) return precioPar || precioUnidad;
+    return precioUnidad;
+  };
+
+  // ===================================
+  //     AGREGAR PRODUCTO AL CARRITO
+  // ===================================
   const agregarAlCarrito = () => {
     const filtered = getFilteredCatalog();
     const currentProduct = filtered[carouselIndex];
@@ -511,7 +573,8 @@ export default function ChatBot() {
       return;
     }
 
-    const precio = calcularPrecio(currentProduct, cantidad);
+    // Precio preliminar solo para mostrar (se recalcula luego según método de pago)
+    const precioPre = calcularPrecioPreview(currentProduct, cantidad);
 
     const item = {
       CODIGO_INTERNO: currentProduct.CODIGO_INTERNO,
@@ -521,10 +584,26 @@ export default function ChatBot() {
       TALLA: selectedTalla || currentProduct.TALLA_SIMPLE || "N/A",
       COLOR: currentProduct.COLOR,
       CANTIDAD: cantidad,
+
+      // Precios normales
+      PRECIO_UNIDAD: currentProduct.PRECIO_UNIDAD,
+      PRECIO_PAR: currentProduct.PRECIO_PAR,
+      PRECIO_MEDIADOCENA: currentProduct.PRECIO_MEDIADOCENA,
+      PRECIO_DOCENA: currentProduct.PRECIO_DOCENA,
+      PRECIO_CAJA_MAYOR30: currentProduct.PRECIO_CAJA_MAYOR30,
+
+      // Precios depósito (transferencia)
+      PRECIO_UNIDAD_DEPOSITO: currentProduct.PRECIO_UNIDAD_DEPOSITO,
+      PRECIO_PAR_DEPOSITO: currentProduct.PRECIO_PAR_DEPOSITO,
+      PRECIO_MEDIADOCENA_DEPOSITO: currentProduct.PRECIO_MEDIADOCENA_DEPOSITO,
+      PRECIO_DOCENA_DEPOSITO: currentProduct.PRECIO_DOCENA_DEPOSITO,
+      PRECIO_CAJA_MAYOR30_DEPOSITO: currentProduct.PRECIO_CAJA_MAYOR30_DEPOSITO,
+
+      // Pre-cálculo (se volverá a calcular según método de pago real)
       PRECIO_UNITARIO: currentProduct.PRECIO_UNIDAD,
-      PRECIO_APLICADO: precio,
+      PRECIO_APLICADO: precioPre,
       DESCUENTO_POR_CANTIDAD: 0,
-      SUBTOTAL_ITEM: precio * cantidad,
+      SUBTOTAL_ITEM: precioPre * cantidad,
       FOTO: currentProduct.FOTO || "",
     };
 
@@ -535,7 +614,7 @@ export default function ChatBot() {
 
     addMessage(
       `✅ Agregado: ${item.DESCRIPCION} (${item.TALLA}) x${cantidad} = $${(
-        precio * cantidad
+        precioPre * cantidad
       ).toFixed(2)}`,
       "bot"
     );
@@ -550,6 +629,9 @@ export default function ChatBot() {
     setCantidad(1);
   };
 
+  // ===================================
+  //            MOSTRAR CARRITO
+  // ===================================
   const mostrarCarrito = () => {
     if (sessionData.carrito.length === 0) {
       addMessage("🛒 Tu carrito está vacío", "bot");
@@ -558,27 +640,37 @@ export default function ChatBot() {
 
     let texto = "🛒 *TU CARRITO:*\n\n";
     let subtotal = 0;
+    const metodo = sessionData.metodo_pago || "Contra entrega";
 
     sessionData.carrito.forEach((item, idx) => {
+      const precio = calcularPrecioItem(item, metodo);
+      const subItem = precio * item.CANTIDAD;
+
       texto += `${idx + 1}. ${item.DESCRIPCION}\n`;
       texto += `   Talla: ${item.TALLA} | Cant: ${
         item.CANTIDAD
-      }\n   $${item.PRECIO_APLICADO} x ${
+      }\n   $${precio.toFixed(2)} x ${
         item.CANTIDAD
-      } = $${item.SUBTOTAL_ITEM.toFixed(2)}\n\n`;
-      subtotal += item.SUBTOTAL_ITEM;
+      } = $${subItem.toFixed(2)}\n\n`;
+
+      subtotal += subItem;
     });
 
     texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
     addMessage(texto, "bot");
   };
 
-  // ---------- RESUMEN ----------
+  // ===================================
+  //            MOSTRAR RESUMEN
+  // ===================================
   const mostrarResumen = () => {
-    const subtotal = sessionData.carrito.reduce(
-      (sum, item) => sum + item.SUBTOTAL_ITEM,
-      0
-    );
+    const metodo = sessionData.metodo_pago || "Contra entrega";
+
+    const subtotal = sessionData.carrito.reduce((sum, item) => {
+      const precio = calcularPrecioItem(item, metodo);
+      return sum + precio * item.CANTIDAD;
+    }, 0);
+
     const total = subtotal + sessionData.costo_envio;
 
     let resumen = `📋 *RESUMEN DE TU PEDIDO*\n\n`;
@@ -587,9 +679,11 @@ export default function ChatBot() {
 
     resumen += `📦 *Productos (${sessionData.carrito.length}):*\n`;
     sessionData.carrito.forEach((item, idx) => {
+      const precio = calcularPrecioItem(item, metodo);
+      const subItem = precio * item.CANTIDAD;
       resumen += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA}) x${
         item.CANTIDAD
-      }\n`;
+      } → $${subItem.toFixed(2)}\n`;
     });
 
     resumen += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
@@ -629,7 +723,9 @@ export default function ChatBot() {
     ]);
   };
 
-  // ---------- SUBIR COMPROBANTE DESPUÉS DE LA FACTURA ----------
+  // ===================================
+  //     SUBIR COMPROBANTE DESPUÉS
+  // ===================================
   const subirComprobanteDespuesDeFactura = async (factura) => {
     if (!sessionData.foto_comprobante_base64) return;
     try {
@@ -650,14 +746,54 @@ export default function ChatBot() {
     }
   };
 
-  // ---------- CREAR PEDIDO + COMPROBANTE ----------
-  const crearPedidoConComprobante = async (pedido, subtotal, total) => {
+  // ===================================
+  //      CREAR PEDIDO + COMPROBANTE
+  // ===================================
+  const crearPedidoConComprobante = async () => {
+    const metodo = sessionData.metodo_pago || "Contra entrega";
+
+    const subtotal = sessionData.carrito.reduce((sum, item) => {
+      const precio = calcularPrecioItem(item, metodo);
+      return sum + precio * item.CANTIDAD;
+    }, 0);
+
+    const total = subtotal + sessionData.costo_envio;
+
+    // Recalcular precios por producto para enviar limpios al backend
+    const productos = sessionData.carrito.map((item) => {
+      const precio = calcularPrecioItem(item, metodo);
+      const subItem = precio * item.CANTIDAD;
+      return {
+        ...item,
+        PRECIO_APLICADO: precio,
+        SUBTOTAL_ITEM: subItem,
+      };
+    });
+
+    const pedido = {
+      telefono: sessionData.telefono,
+      nombre: sessionData.nombre,
+      departamento: sessionData.departamento,
+      municipio: sessionData.municipio,
+      direccion: sessionData.direccion,
+      punto_referencia: sessionData.punto_referencia,
+      metodo_pago: sessionData.metodo_pago,
+      tipo_entrega: sessionData.tipo_entrega,
+      encomiendista: sessionData.encomiendista,
+      costo_envio: sessionData.costo_envio,
+      subtotal,
+      descuento: 0,
+      total,
+      productos,
+    };
+
     try {
       const res = await fetch(`${SCRIPT_URL}?route=crearPedido`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pedido),
       });
+
       const data = await res.json();
 
       if (data.success) {
@@ -681,13 +817,13 @@ export default function ChatBot() {
         "⚠️ No se pudo conectar con el sistema\nEnviando el pedido por WhatsApp...",
         "bot"
       );
-      const subtotalLocal = pedido.subtotal;
-      const totalLocal = pedido.total;
-      enviarWhatsApp(subtotalLocal, totalLocal);
+      enviarWhatsApp(subtotal, total);
     }
   };
 
-  // ---------- FILE -> BASE64 ----------
+  // ===================================
+  //         FILE → BASE64
+  // ===================================
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -702,17 +838,21 @@ export default function ChatBot() {
 
   const handleFileUpload = async (file) => {
     if (!file) return;
+
     addMessage("📸 Recibiendo comprobante, procesando imagen...", "bot");
+
     try {
       const base64 = await fileToBase64(file);
       setSessionData((prev) => ({
         ...prev,
         foto_comprobante_base64: base64,
       }));
+
       addMessage(
         "✅ Comprobante recibido.\n\nAhora te muestro el resumen para confirmar tu pedido:",
         "bot"
       );
+
       setSessionData((prev) => ({ ...prev, step: "confirmar" }));
       mostrarResumen();
     } catch (e) {
@@ -723,48 +863,24 @@ export default function ChatBot() {
     }
   };
 
-  // ---------- CREAR PEDIDO (LLAMADO DESDE EL FLUJO) ----------
-  const crearPedidoEnSheet = async () => {
-    const subtotal = sessionData.carrito.reduce(
-      (sum, item) => sum + item.SUBTOTAL_ITEM,
-      0
-    );
-    const total = subtotal + sessionData.costo_envio;
-
-    const pedido = {
-    telefono: sessionData.telefono,
-    nombre: sessionData.nombre,
-    municipio: sessionData.municipio,
-    direccion: sessionData.direccion,
-    punto_referencia: sessionData.punto_referencia,
-    metodo_pago: sessionData.metodo_pago,
-    tipo_entrega: sessionData.tipo_entrega,
-    encomiendista: sessionData.encomiendista,
-    costo_envio: sessionData.costo_envio,
-    subtotal: subtotal,
-    descuento: 0,
-    total: total,
-    productos: sessionData.carrito,
-
-    // 👇 ESTA ES LA PARTE QUE FALTABA
-    comprobante: sessionData.foto_comprobante 
-};
-
-    await crearPedidoConComprobante(pedido, subtotal, total);
-  };
-
-  // ---------- WhatsApp ----------
+  // ===================================
+  //             WHATSAPP
+  // ===================================
   const enviarWhatsApp = (subtotal, total) => {
+    const metodo = sessionData.metodo_pago || "Contra entrega";
+
     let mensaje = `🛍️ *NUEVO PEDIDO - GyS Importadora*\n\n`;
     mensaje += `👤 *Cliente:* ${sessionData.nombre}\n`;
     mensaje += `📱 *Teléfono:* ${sessionData.telefono}\n\n`;
 
     mensaje += `📦 *PRODUCTOS:*\n`;
     sessionData.carrito.forEach((item, idx) => {
+      const precio = calcularPrecioItem(item, metodo);
+      const subItem = precio * item.CANTIDAD;
       mensaje += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
-      mensaje += `   Cant: ${item.CANTIDAD} x $${item.PRECIO_APLICADO} = $${item.SUBTOTAL_ITEM.toFixed(
+      mensaje += `   Cant: ${item.CANTIDAD} x $${precio.toFixed(
         2
-      )}\n`;
+      )} = $${subItem.toFixed(2)}\n`;
     });
 
     mensaje += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
@@ -811,13 +927,15 @@ export default function ChatBot() {
     }, 1000);
   };
 
-  // ---------- PROCESAR MENSAJES ----------
+  // ===================================
+  //          PROCESAR MENSAJES
+  // ===================================
   const processMessage = async (userInput) => {
     addMessage(userInput, "user");
     const input = userInput.toLowerCase().trim();
     const session = sessionData;
 
-    // NOMBRE
+    // 1) NOMBRE
     if (session.step === "inicio") {
       const partes = userInput.trim().split(/\s+/);
       if (partes.length >= 2) {
@@ -839,7 +957,7 @@ export default function ChatBot() {
       return;
     }
 
-    // TELÉFONO
+    // 2) TELÉFONO
     if (session.step === "telefono") {
       const tel = userInput.replace(/[^0-9]/g, "");
       if (tel.length >= 8) {
@@ -861,7 +979,7 @@ export default function ChatBot() {
       return;
     }
 
-    // MENÚ PRINCIPAL
+    // 3) MENÚ PRINCIPAL
     if (input === "catalogo") {
       setShowCarousel(true);
       setCarouselIndex(0);
@@ -889,7 +1007,7 @@ export default function ChatBot() {
       return;
     }
 
-    // CONTINUAR PEDIDO
+    // 4) CONTINUAR PEDIDO
     if (input === "continuar_pedido") {
       if (session.carrito.length === 0) {
         addMessage(
@@ -903,6 +1021,7 @@ export default function ChatBot() {
         (sum, item) => sum + item.CANTIDAD,
         0
       );
+
       if (totalProductos >= 3) {
         setSessionData((prev) => ({ ...prev, step: "tipo_envio_3mas" }));
         addMessage(
@@ -924,7 +1043,7 @@ export default function ChatBot() {
       return;
     }
 
-    // TIPOS DE ENTREGA
+    // 5) TIPO DE ENTREGA
     if (input === "tipo_personalizado") {
       setSessionData((prev) => ({
         ...prev,
@@ -999,7 +1118,7 @@ export default function ChatBot() {
       return;
     }
 
-    // PERSONALIZADO: DEPARTAMENTO / MUNICIPIO / PUNTO
+    // 6) PERSONALIZADO: DPTO / MUNICIPIO / REFERENCIA
     if (input.startsWith("dep_pers_")) {
       const departamentoInput = input.replace("dep_pers_", "");
       const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
@@ -1007,6 +1126,7 @@ export default function ChatBot() {
       );
       const departamento = departamentoKey || departamentoInput;
       const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
+
       if (!municipios.length) {
         addMessage(
           `⚠️ No se encontraron municipios para ${departamentoInput}.`,
@@ -1015,6 +1135,7 @@ export default function ChatBot() {
         );
         return;
       }
+
       setSessionData((prev) => ({
         ...prev,
         departamento,
@@ -1065,7 +1186,7 @@ export default function ChatBot() {
       return;
     }
 
-    // MÉTODO DE PAGO
+    // 7) MÉTODO DE PAGO
     if (input === "contra_entrega") {
       setSessionData((prev) => ({
         ...prev,
@@ -1084,54 +1205,59 @@ export default function ChatBot() {
         step: "esperando_comprobante",
       }));
       addMessage(
-  "💳 Has elegido *Transferencia*.\n\n📸 Ahora sube la *foto del comprobante* usando el botón 📷 de abajo.",
-  "bot"
-);
-addMessage({
-  type: "quick_replies",
-  text: "¿Qué deseas hacer?",
-  replies: [
-    {
-      title: "📷 Subir comprobante",
-      payload: "subir_comprobante"
-    },
-    {
-      title: "📤 Enviar después",
-      payload: "omitir_comprobante"
+        "💳 Has elegido *Transferencia*.\n\n📸 Puedes subir *la foto del comprobante* usando el botón 📷 de abajo.\n\nSi aún no la tienes, puedes continuar sin subirla.",
+        "bot",
+        [
+          { label: "📷 Subir comprobante ahora", value: "subir_ahora" },
+          { label: "➡️ Enviarlo después", value: "subir_despues" },
+        ]
+      );
+      return;
     }
-  ]
-});
-return;
 
-// 🟣 Manejo del botón "Subir comprobante"
-if (input === "subir_comprobante") {
-  addMessage("📸 Perfecto, sube la *foto del comprobante* usando el botón de cámara 📷.", "bot");
-  sessionData.esperando_comprobante = true;
-  return;
-}
+    if (input === "subir_ahora") {
+      addMessage(
+        "Pulsa el botón 📷 de abajo para seleccionar la foto del comprobante.",
+        "bot"
+      );
+      return;
+    }
 
-// 🟣 Manejo del botón "Enviar después"
-if (input === "omitir_comprobante") {
-  addMessage("✉️ Está bien, puedes enviarlo después. Procederé a crear tu pedido...", "bot");
-  sessionData.foto_comprobante = "";
-  await crearPedidoEnSheet();
-  return;
-}
+    if (input === "subir_despues") {
+      // No hay comprobante todavía, pero dejamos continuar
+      setSessionData((prev) => ({
+        ...prev,
+        step: "confirmar",
+      }));
+      addMessage(
+        "Perfecto 👍 Podrás enviar el comprobante después.\n\nTe muestro el resumen:",
+        "bot"
+      );
+      mostrarResumen();
+      return;
+    }
 
-
+    // 8) CONFIRMAR / CANCELAR
     if (input === "confirmar_pedido") {
-      await crearPedidoEnSheet();
+      await crearPedidoConComprobante();
       return;
     }
 
     if (input === "cancelar") {
-      addMessage("❌ Pedido cancelado. Si deseas, puedes empezar de nuevo.", "bot");
+      addMessage(
+        "❌ Pedido cancelado. Si deseas, puedes empezar de nuevo.",
+        "bot"
+      );
       return;
     }
 
+    // Default
     addMessage("No entendí esa opción 😅 Usa los botones disponibles.", "bot");
   };
 
+  // ===================================
+  //      HANDLERS DE INPUT / BOTONES
+  // ===================================
   const handleSend = () => {
     if (!input.trim()) return;
     processMessage(input);
@@ -1145,6 +1271,9 @@ if (input === "omitir_comprobante") {
   const filtered = getFilteredCatalog();
   const currentProduct = filtered[carouselIndex];
 
+  // ===================================
+  //               UI
+  // ===================================
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 to-purple-50">
       <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-4 shadow-lg">
@@ -1455,9 +1584,10 @@ if (input === "omitir_comprobante") {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* FOOTER INPUT */}
       <div className="bg-white border-t p-4 shadow-lg">
         <div className="max-w-4xl mx-auto flex gap-2 items-center">
-          {/* INPUT DE TEXTO */}
+          {/* Input de texto */}
           <input
             type="text"
             value={input}
@@ -1467,7 +1597,7 @@ if (input === "omitir_comprobante") {
             className="flex-1 px-4 py-3 border-2 border-purple-200 rounded-full focus:outline-none focus:border-purple-500"
           />
 
-          {/* INPUT DE ARCHIVO OCULTO */}
+          {/* Input de archivo oculto */}
           <input
             id="fileInput"
             type="file"
@@ -1476,7 +1606,7 @@ if (input === "omitir_comprobante") {
             onChange={(e) => handleFileUpload(e.target.files[0])}
           />
 
-          {/* BOTÓN CÁMARA */}
+          {/* Botón cámara */}
           <label
             htmlFor="fileInput"
             className="bg-purple-500 text-white p-3 rounded-full cursor-pointer hover:bg-purple-600 transition-all"
@@ -1484,7 +1614,7 @@ if (input === "omitir_comprobante") {
             📷
           </label>
 
-          {/* BOTÓN ENVIAR TEXTO */}
+          {/* Botón enviar */}
           <button
             onClick={handleSend}
             className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-3 rounded-full hover:from-pink-600 hover:to-purple-700 transition-all"
