@@ -732,20 +732,23 @@ export default function ChatBot() {
     const total = subtotal + sessionData.costo_envio;
 
     const pedido = {
-      telefono: sessionData.telefono,
-      nombre: sessionData.nombre,
-      municipio: sessionData.municipio,
-      direccion: sessionData.direccion,
-      punto_referencia: sessionData.punto_referencia,
-      metodo_pago: sessionData.metodo_pago,
-      tipo_entrega: sessionData.tipo_entrega,
-      encomiendista: sessionData.encomiendista,
-      costo_envio: sessionData.costo_envio,
-      subtotal,
-      descuento: 0,
-      total,
-      productos: sessionData.carrito,
-    };
+    telefono: sessionData.telefono,
+    nombre: sessionData.nombre,
+    municipio: sessionData.municipio,
+    direccion: sessionData.direccion,
+    punto_referencia: sessionData.punto_referencia,
+    metodo_pago: sessionData.metodo_pago,
+    tipo_entrega: sessionData.tipo_entrega,
+    encomiendista: sessionData.encomiendista,
+    costo_envio: sessionData.costo_envio,
+    subtotal: subtotal,
+    descuento: 0,
+    total: total,
+    productos: sessionData.carrito,
+
+    // 👇 ESTA ES LA PARTE QUE FALTABA
+    comprobante: sessionData.foto_comprobante 
+};
 
     await crearPedidoConComprobante(pedido, subtotal, total);
   };
