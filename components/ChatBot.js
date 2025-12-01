@@ -1087,7 +1087,6 @@ export default function ChatBot() {
   "💳 Has elegido *Transferencia*.\n\n📸 Ahora sube la *foto del comprobante* usando el botón 📷 de abajo.",
   "bot"
 );
-// 🔥 AGREGAR ESTO AQUÍ 🔥
 addMessage({
    type: "quick_replies",
    text: "¿Qué deseas hacer?",
