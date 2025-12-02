@@ -1,37 +1,35 @@
-// /api/sheets.js
-export default async function handler(req, res) {
-  const APPS_SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbw7LP5JTdlfg6X5yE5Rr9jzDdT_93WxySpS1tiJ9y9iHzl1ZXgbsxM4vqyt3Di3g_Vr/exec";
+// /pages/api/sheets.js
 
-  // ============ GET (CATÁLOGO / ENCOMIENDAS) =============
+export default async function handler(req, res) {
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw7LPS7TIdfg6X5yE5Rr9jzDdT_93kwySpSi1tJ9y9iHz1lZKgbSxM4vqyt3Di3g_Vr/exec";
+
+  // GET → Catálogo / Encomiendas
   if (req.method === "GET") {
     try {
       const query = new URLSearchParams(req.query).toString();
       const url = `${APPS_SCRIPT_URL}?${query}`;
-
       const response = await fetch(url);
       const data = await response.json();
-
       return res.status(200).json(data);
     } catch (err) {
       console.error("Error proxy GET:", err);
       return res.status(500).json({
         error: true,
-        message: "Error en proxy GET",
+        message: "Error en proxy GET"
       });
     }
   }
 
-  // ============ POST (CREAR PEDIDO / SUBIR COMPROBANTE) ============
+  // POST → Crear Pedido / Comprobante
   if (req.method === "POST") {
     try {
       const response = await fetch(APPS_SCRIPT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          route: req.query.route,  // 👈 ESTA ES LA LÍNEA IMPORTANTE
-          data: req.body,          // datos del pedido
-        }),
+          route: req.body.route, // IMPORTANTE
+          data: req.body         // Datos enviados
+        })
       });
 
       const data = await response.json();
@@ -40,7 +38,7 @@ export default async function handler(req, res) {
       console.error("Error proxy POST:", err);
       return res.status(500).json({
         error: true,
-        message: "Error en proxy POST",
+        message: "Error en proxy POST"
       });
     }
   }
