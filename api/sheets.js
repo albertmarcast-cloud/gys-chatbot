@@ -1,23 +1,23 @@
-// /pages/api/sheets.js
+// /api/sheets.js
 
 export default async function handler(req, res) {
   const APPS_SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbw7LP5JTdlfg6X5yE5Rr9jzDdT_93WxySpS1tiJ9y9iHzl1ZXgbsxM4vqyt3Di3g_Vr/exec";
 
-  // ============================
-  // 🔵 GET → Catálogo / Encomiendas / Pedido
-  // ============================
+  // =============================
+  // GET → Catálogo y Encomiendas
+  // =============================
   if (req.method === "GET") {
     try {
-      const qs = new URLSearchParams(req.query).toString();
-      const url = `${APPS_SCRIPT_URL}?${qs}`;
+      const query = new URLSearchParams(req.query).toString();
+      const url = `${APPS_SCRIPT_URL}?${query}`;
 
       const response = await fetch(url);
       const data = await response.json();
 
       return res.status(200).json(data);
-    } catch (error) {
-      console.error("Error proxy GET:", error);
+    } catch (err) {
+      console.error("Error proxy GET:", err);
       return res.status(500).json({
         error: true,
         message: "Error en proxy GET",
@@ -25,23 +25,24 @@ export default async function handler(req, res) {
     }
   }
 
-  // ============================
-  // 🔴 POST → Crear Pedido / Subir Comprobante
-  // ============================
+  // =============================
+  // POST → Crear Pedido / Subir Comprobante
+  // =============================
   if (req.method === "POST") {
     try {
       const response = await fetch(APPS_SCRIPT_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(req.body),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          route: req.body.route, // ← IMPORTANTE
+          data: req.body,        // ← IMPORTANTE
+        }),
       });
 
       const data = await response.json();
       return res.status(200).json(data);
-    } catch (error) {
-      console.error("Error proxy POST:", error);
+    } catch (err) {
+      console.error("Error proxy POST:", err);
       return res.status(500).json({
         error: true,
         message: "Error en proxy POST",
@@ -49,6 +50,5 @@ export default async function handler(req, res) {
     }
   }
 
-  // Otros métodos no permitidos
   return res.status(405).json({ error: "Método no permitido" });
 }
