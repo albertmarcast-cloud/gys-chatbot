@@ -14,7 +14,7 @@ import {
 
 // URL de tu Apps Script
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwg82yOtGym8EtQgJlC6J4qbgka518Wubl38Yasnh9GiZ25WGKHKTqnxctR35ARe0ob/exec";
+  "https://script.google.com/macros/s/AKfycbwP7vnkaguQo7tUZQ-cnEvJa79Kvcb4aRZoH8YC1TRhEC0BhiFA-sIXd3ohjmBFSGPv/exec";
 
 // WhatsApp del negocio
 const WHATSAPP_NEGOCIO = "50375936319";
