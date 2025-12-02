@@ -1,12 +1,9 @@
 // /api/sheets.js
-
 export default async function handler(req, res) {
   const APPS_SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbw7LP5JTdlfg6X5yE5Rr9jzDdT_93WxySpS1tiJ9y9iHzl1ZXgbsxM4vqyt3Di3g_Vr/exec";
 
-  // =============================
-  // GET → Catálogo y Encomiendas
-  // =============================
+  // ============ GET (CATÁLOGO / ENCOMIENDAS) =============
   if (req.method === "GET") {
     try {
       const query = new URLSearchParams(req.query).toString();
@@ -25,17 +22,15 @@ export default async function handler(req, res) {
     }
   }
 
-  // =============================
-  // POST → Crear Pedido / Subir Comprobante
-  // =============================
+  // ============ POST (CREAR PEDIDO / SUBIR COMPROBANTE) ============
   if (req.method === "POST") {
     try {
       const response = await fetch(APPS_SCRIPT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          route: req.body.route, // ← IMPORTANTE
-          data: req.body,        // ← IMPORTANTE
+          route: req.query.route,  // 👈 ESTA ES LA LÍNEA IMPORTANTE
+          data: req.body,          // datos del pedido
         }),
       });
 
