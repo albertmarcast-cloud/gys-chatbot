@@ -14,7 +14,7 @@ import {
 
 // URL de tu Apps Script
 const SCRIPT_URL =
-  "https://gys-chatbot-63xw.vercel.app/api/sheets";
+  "https://script.google.com/macros/s/AKfycbw7LPS7TIdfg6X5yE5Rr9jzDdT_93kwySpSi1tJ9y9iHz1lZKgbSxM4vqyt3Di3g_Vr/exec";
 
 // WhatsApp del negocio
 const WHATSAPP_NEGOCIO = "50375936319";
