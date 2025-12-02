@@ -4,7 +4,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyOHi4qZyxwvdGy826isCABC7JQqeEGvZ8kFT9FzbVi_s5NYKFkHZFVrtoQB6r9NpM/exec';
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw7LP5JTdlfg6X5yE5Rr9jzDdT_93WxySpS1tiJ9y9iHzl1ZXgbsxM4vqyt3Di3g_Vr/exec';
 
   try {
     // Reenviar la petición al Apps Script
