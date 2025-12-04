@@ -597,7 +597,7 @@ export default function ChatBot( ) {
     // Precio preliminar solo para mostrar (se recalcula luego según método de pago)
     const precioPre = calcularPrecioPreview(currentProduct, cantidad);
 
-    const item = {
+    const newItem = {
       CODIGO_INTERNO: currentProduct.CODIGO_INTERNO,
       CODIGO: currentProduct.CODIGO,
       CATEGORIA: currentProduct.CATEGORIA,
@@ -628,17 +628,52 @@ export default function ChatBot( ) {
       FOTO: currentProduct.FOTO || "",
     };
 
-    setSessionData((prev) => ({
-      ...prev,
-      carrito: [...prev.carrito, item],
-    }));
+    setSessionData((prev) => {
+      const existingIndex = prev.carrito.findIndex(
+        (cartItem) =>
+          cartItem.CODIGO_INTERNO === newItem.CODIGO_INTERNO &&
+          cartItem.TALLA === newItem.TALLA
+      );
 
-    addMessage(
-      `✅ Agregado: ${item.DESCRIPCION} (${item.TALLA}) x${cantidad} = $${(
-        precioPre * cantidad
-      ).toFixed(2)}`,
-      "bot"
-    );
+      let newCarrito;
+      let newCantidad;
+      let newPricePre;
+
+      if (existingIndex > -1) {
+        // Consolidar: sumar cantidad y recalcular subtotal
+        newCarrito = [...prev.carrito];
+        const existingItem = newCarrito[existingIndex];
+        newCantidad = existingItem.CANTIDAD + newItem.CANTIDAD;
+        
+        // Recalcular precio basado en la nueva cantidad total
+        newPricePre = calcularPrecioPreview(currentProduct, newCantidad);
+
+        newCarrito[existingIndex] = {
+          ...existingItem,
+          CANTIDAD: newCantidad,
+          PRECIO_APLICADO: newPricePre,
+          SUBTOTAL_ITEM: newPricePre * newCantidad,
+        };
+      } else {
+        // Agregar nuevo item
+        newCarrito = [...prev.carrito, newItem];
+        newCantidad = newItem.CANTIDAD;
+        newPricePre = newItem.PRECIO_APLICADO;
+      }
+
+      // El mensaje de confirmación debe usar la cantidad y precio del item agregado/consolidado
+      addMessage(
+        `✅ Agregado: ${newItem.DESCRIPCION} (${newItem.TALLA}) x${newItem.CANTIDAD} = $${(
+          newItem.PRECIO_APLICADO * newItem.CANTIDAD
+        ).toFixed(2)}`,
+        "bot"
+      );
+
+      return {
+        ...prev,
+        carrito: newCarrito,
+      };
+    });
 
     addMessage("¿Qué deseas hacer?", "bot", [
       { label: "➕ Agregar más productos", value: "agregar_mas" },
@@ -728,7 +763,7 @@ export default function ChatBot( ) {
         if (targetQty === 30 && remaining <= 10) mostrar = true;
 
         if (mostrar) {
-          texto += `💡 *¡Aprovecha!*`;
+          texto += `💡 *¡Aprovecha en ${group.categoria}!*`;
           texto += `\nSolo ${remaining} piezas más para llegar a ${targetName}.`;
           texto += `\n¡El precio bajará automáticamente a $${targetPrice.toFixed(2)} c/u! 🔥\n\n`;
         }
@@ -809,30 +844,34 @@ export default function ChatBot( ) {
     if (tipoEnvioTexto === "PUNTO FIJO") tipoEnvioTexto = "📍 PUNTO FIJO";
     if (tipoEnvioTexto === "CASILLERO") tipoEnvioTexto = "📦 CASILLERO";
 
-    resumen += `🚚 Envío (${tipoEnvioTexto}): $${sessionData.costo_envio.toFixed(
-      2
-    )}\n`;
-    resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
+    resumen += `\n💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
 
-    // 2.B Orden correcto de datos de envío
-    resumen += `📍 ${sessionData.departamento} - ${sessionData.municipio}\n`;
+    // DETALLES DEL ENVÍO (Nuevo orden solicitado)
+    resumen += `*DETALLES DEL ENVÍO:*\n`;
+    resumen += `🚚 ENVÍO: ${tipoEnvioTexto}\n`;
+    resumen += `📍 DEPARTAMENTO: ${sessionData.departamento}\n`;
+    resumen += `🗺️ MUNICIPIO: ${sessionData.municipio}\n`;
 
-    if (sessionData.tipo_entrega === "PERSONALIZADO") {
-      resumen += `📌 ${sessionData.punto_referencia}\n`;
-    } else {
-      if (sessionData.encomiendista_nombre) {
-        resumen += `🚛 ${sessionData.encomiendista_nombre}\n`;
-      }
-      if (sessionData.punto_referencia) {
-        resumen += `📌 ${sessionData.punto_referencia}\n`; // Usar 📌 para punto de referencia
-      }
-      if (sessionData.dia_entrega) {
-        resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
-      }
+    if (sessionData.punto_referencia) {
+      resumen += `📌 PUNTO DE REFERENCIA: ${sessionData.punto_referencia}\n`;
     }
 
-    // 2.C Método de pago ordenado y claro (siempre al final)
-    resumen += `\n💳 ${sessionData.metodo_pago}\n\n`;
+    if (sessionData.encomiendista_nombre && sessionData.tipo_entrega !== "PERSONALIZADO") {
+      resumen += `🚛 ENCOMIENDISTA: ${sessionData.encomiendista_nombre}\n`;
+    }
+
+    if (sessionData.dia_entrega) {
+      resumen += `📅 DÍA DE ENTREGA: ${sessionData.dia_entrega}\n`;
+    }
+
+    if (sessionData.hora_entrega) {
+      resumen += `⏰ HORA DE ENTREGA: ${sessionData.hora_entrega}\n`;
+    }
+
+    resumen += `💵 COSTO DE ENVÍO: $${sessionData.costo_envio.toFixed(2)}\n`;
+
+    // Método de pago ordenado y claro (siempre al final)
+    resumen += `\n💳 MÉTODO DE PAGO: ${sessionData.metodo_pago}\n\n`;
     resumen += `¿Todo correcto?`;
 
     addMessage(resumen, "bot", [
@@ -1002,37 +1041,38 @@ export default function ChatBot( ) {
     });
 
     mensaje += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
+    mensaje += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
 
     let tipoTexto = sessionData.tipo_entrega;
     if (tipoTexto === "PERSONALIZADO") tipoTexto = "🏠 PERSONALIZADO";
     if (tipoTexto === "PUNTO FIJO") tipoTexto = "📍 PUNTO FIJO";
     if (tipoTexto === "CASILLERO") tipoTexto = "📦 CASILLERO";
 
-    mensaje += `🚚 Envío (${tipoTexto}): $${sessionData.costo_envio.toFixed(
-      2
-    )}\n`;
-    mensaje += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
+    // DETALLES DEL ENVÍO (Nuevo orden solicitado)
+    mensaje += `*DETALLES DEL ENVÍO:*\n`;
+    mensaje += `🚚 ENVÍO: ${tipoTexto}\n`;
+    mensaje += `📍 DEPARTAMENTO: ${sessionData.departamento}\n`;
+    mensaje += `🗺️ MUNICIPIO: ${sessionData.municipio}\n`;
 
-    mensaje += `📍 *UBICACIÓN:*\n`;
-    mensaje += `${sessionData.departamento} - ${sessionData.municipio}\n`;
-
-    if (sessionData.tipo_entrega === "PERSONALIZADO") {
-      if (sessionData.punto_referencia) {
-        mensaje += `📌 Punto de referencia: ${sessionData.punto_referencia}\n`;
-      }
-    } else {
-      if (sessionData.encomiendista_nombre) {
-        mensaje += `🚛 ${sessionData.encomiendista_nombre}\n`;
-      }
-      if (sessionData.punto_referencia) {
-        mensaje += `📍 Punto: ${sessionData.punto_referencia}\n`;
-      }
-      if (sessionData.dia_entrega) {
-        mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
-      }
+    if (sessionData.punto_referencia) {
+      mensaje += `📌 PUNTO DE REFERENCIA: ${sessionData.punto_referencia}\n`;
     }
 
-    mensaje += `\n💳 *Pago:* ${sessionData.metodo_pago}\n\n`;
+    if (sessionData.encomiendista_nombre && sessionData.tipo_entrega !== "PERSONALIZADO") {
+      mensaje += `🚛 ENCOMIENDISTA: ${sessionData.encomiendista_nombre}\n`;
+    }
+
+    if (sessionData.dia_entrega) {
+      mensaje += `📅 DÍA DE ENTREGA: ${sessionData.dia_entrega}\n`;
+    }
+
+    if (sessionData.hora_entrega) {
+      mensaje += `⏰ HORA DE ENTREGA: ${sessionData.hora_entrega}\n`;
+    }
+
+    mensaje += `💵 COSTO DE ENVÍO: $${sessionData.costo_envio.toFixed(2)}\n`;
+
+    mensaje += `\n💳 MÉTODO DE PAGO: ${sessionData.metodo_pago}\n\n`;
     mensaje += `✨ _Pedido desde chatbot automático_`;
 
     const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
