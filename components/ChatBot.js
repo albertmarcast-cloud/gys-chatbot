@@ -840,25 +840,28 @@ export default function ChatBot( ) {
     resumen += `💵 costo_envio: $${sessionData.costo_envio.toFixed(2)}\n`;
 
     // DETALLES DEL ENVÍO (Nuevo orden solicitado)
-    resumen += `*DETALLES DEL ENVÍO:*\n`;
+    resumen += `*DETALLES DEL ENVÍO:*\n\n`;
     resumen += `🚚 envío: ${tipoEnvioTexto}\n`;
     resumen += `📍 departamento: ${sessionData.departamento}\n`;
-    resumen += `🗺️ municipio: ${sessionData.municipio}\n`;
-
+    let ubicacionAgrupada = sessionData.municipio;
     if (sessionData.punto_referencia) {
-      resumen += `📌 punto_referencia: ${sessionData.punto_referencia}\n`;
+      ubicacionAgrupada += ` - ${sessionData.punto_referencia}`;
     }
+    resumen += `📍 ${ubicacionAgrupada}\n`;
 
     if (sessionData.encomiendista_nombre && sessionData.tipo_entrega !== "PERSONALIZADO") {
       resumen += `🚛 encomendista: ${sessionData.encomiendista_nombre}\n`;
     }
 
+    let tiempoAgrupado = "";
     if (sessionData.dia_entrega) {
-      resumen += `📅 dia_entrega: ${sessionData.dia_entrega}\n`;
+      tiempoAgrupado += `📅 ${sessionData.dia_entrega}`;
     }
-
     if (sessionData.hora_entrega) {
-      resumen += `⏰ hora_entrega: ${sessionData.hora_entrega}\n`;
+      tiempoAgrupado += ` | ⏰ ${sessionData.hora_entrega}`;
+    }
+    if (tiempoAgrupado) {
+      resumen += `${tiempoAgrupado}\n\n`;
     }
 
     resumen += `💳 método_pago: ${sessionData.metodo_pago}\n\n`;
@@ -1041,6 +1044,7 @@ export default function ChatBot( ) {
 
     mensaje += `\n💰 subtotal: $${subtotal.toFixed(2)}\n`;
     mensaje += `💵 costo_envio: $${sessionData.costo_envio.toFixed(2)}\n`;
+    mensaje += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
 
     let tipoTexto = sessionData.tipo_entrega;
     if (tipoTexto === "PERSONALIZADO") tipoTexto = "🏠 PERSONALIZADO";
@@ -1068,8 +1072,6 @@ export default function ChatBot( ) {
     if (sessionData.hora_entrega) {
       mensaje += `⏰ hora_entrega: ${sessionData.hora_entrega}\n`;
     }
-
-    mensaje += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
 
     mensaje += `💳 método_pago: ${sessionData.metodo_pago}\n\n`;
     mensaje += `✨ _Pedido desde chatbot automático_`;
