@@ -453,6 +453,42 @@ export default function ChatBot() {
   };
 
   // ===================================
+  //       SELECCIONAR ENCOMIENDISTA
+  // ===================================
+  const seleccionarEncomienda = () => {
+    const enc = encomiendistas[encomiendaIndex];
+    if (!enc) return;
+
+    setSessionData((prev) => ({
+      ...prev,
+      encomiendista: enc.ID_ENCOMIENDISTA,
+      encomiendista_nombre: enc.ENCOMIENDISTA,
+      encomiendista_telefono: enc.TELEFONO_ENCOMIENDISTA,
+      departamento: enc.DEPARTAMENTO,
+      municipio: enc.MUNICIPIO,
+      costo_envio: enc.COSTO_ENVIO,
+      dia_entrega: enc.DIA_ENTREGA || "",
+      hora_entrega: enc.HORA_ENTREGA || "",
+      punto_referencia: enc.PUNTO_REFERENCIA || "",
+      step: "metodo_pago",
+    }));
+
+    setShowEncomiendaCarousel(false);
+
+    const tipoTexto =
+      sessionData.tipo_entrega === "PUNTO FIJO" ? "punto fijo" : "casillero";
+
+    addMessage(
+      `✅ Seleccionaste ${tipoTexto}: ${enc.ENCOMIENDISTA}\n📍 ${enc.DEPARTAMENTO} - ${enc.MUNICIPIO}\n🏪 ${enc.PUNTO_REFERENCIA}\n💵 Costo: $${enc.COSTO_ENVIO}\n\n¿Cómo deseas pagar?`,
+      "bot",
+      [
+        { label: "💵 Contra entrega", value: "contra_entrega" },
+        { label: "💳 Transferencia", value: "transferencia" },
+      ]
+    );
+  };
+
+  // ===================================
   //   FILTRAR CATÁLOGO POR CATEGORÍA
   // ===================================
   const getFilteredCatalog = () => {
@@ -525,86 +561,7 @@ export default function ChatBot() {
   };
 
   // ===================================
-  //   INCENTIVO DE CANTIDAD (SOLO CARRITO)
-  //   - Agrupa por misma categoría + mismo PRECIO_UNIDAD
-  //   - Solo muestra si faltan 1 ó 2 piezas al siguiente nivel
-  //   - Para caja, solo si faltan <= 10
-  // ===================================
-  const calcularIncentivoCantidad = (item, carrito) => {
-    const categoria = (item.CATEGORIA || "").toString();
-    const precioBase = Number(item.PRECIO_UNIDAD || 0);
-    if (!categoria || !precioBase) return "";
-
-    const grupo = carrito.filter(
-      (p) =>
-        (p.CATEGORIA || "") === categoria &&
-        Number(p.PRECIO_UNIDAD || 0) === precioBase
-    );
-
-    const cantidadGrupo = grupo.reduce(
-      (sum, p) => sum + Number(p.CANTIDAD || 0),
-      0
-    );
-    if (cantidadGrupo <= 0) return "";
-
-    const precios = {
-      unidad: Number(item.PRECIO_UNIDAD || 0),
-      par: Number(item.PRECIO_PAR || 0),
-      media: Number(item.PRECIO_MEDIADOCENA || 0),
-      docena: Number(item.PRECIO_DOCENA || 0),
-      caja: Number(item.PRECIO_CAJA_MAYOR30 || 0),
-    };
-
-    // Ya está en caja, no hay siguiente nivel
-    if (cantidadGrupo >= 30) return "";
-
-    let siguienteMeta = null;
-    let etiquetaMeta = "";
-    let precioNuevo = 0;
-
-    if (cantidadGrupo >= 12) {
-      siguienteMeta = 30;
-      etiquetaMeta = "caja";
-      precioNuevo = precios.caja;
-    } else if (cantidadGrupo >= 6) {
-      siguienteMeta = 12;
-      etiquetaMeta = "docena";
-      precioNuevo = precios.docena;
-    } else if (cantidadGrupo >= 2) {
-      siguienteMeta = 6;
-      etiquetaMeta = "media docena";
-      precioNuevo = precios.media;
-    } else {
-      siguienteMeta = 2;
-      etiquetaMeta = "par";
-      precioNuevo = precios.par;
-    }
-
-    if (!precioNuevo) return "";
-
-    const faltan = siguienteMeta - cantidadGrupo;
-
-    if (etiquetaMeta === "caja") {
-      // Para caja solo si faltan 10 o menos
-      if (faltan <= 0 || faltan > 10) return "";
-    } else {
-      // Para los demás niveles solo si faltan 1 o 2
-      if (faltan <= 0 || faltan > 2) return "";
-    }
-
-    const textoPiezas =
-      faltan === 1 ? "Solo 1 pieza más" : `Solo ${faltan} piezas más`;
-
-    return (
-      "💡 Aprovecha:\n" +
-      `${textoPiezas} para llegar a ${etiquetaMeta}.\n` +
-      `¡Te baja el precio a $${precioNuevo.toFixed(2)} c/u!`
-    );
-  };
-
-  // ===================================
   //     AGREGAR PRODUCTO AL CARRITO
-  //     - Consolida por CODIGO_INTERNO + TALLA + COLOR
   // ===================================
   const agregarAlCarrito = () => {
     const filtered = getFilteredCatalog();
@@ -650,26 +607,10 @@ export default function ChatBot() {
       FOTO: currentProduct.FOTO || "",
     };
 
-    // ✅ Consolidar por CODIGO_INTERNO + TALLA + COLOR
-    setSessionData((prev) => {
-      const carrito = [...prev.carrito];
-      const idxExistente = carrito.findIndex(
-        (p) =>
-          p.CODIGO_INTERNO === item.CODIGO_INTERNO &&
-          p.TALLA === item.TALLA &&
-          p.COLOR === item.COLOR
-      );
-
-      if (idxExistente >= 0) {
-        const actualizado = { ...carrito[idxExistente] };
-        actualizado.CANTIDAD =
-          Number(actualizado.CANTIDAD || 0) + Number(cantidad || 1);
-        carrito[idxExistente] = actualizado;
-        return { ...prev, carrito };
-      } else {
-        return { ...prev, carrito: [...carrito, item] };
-      }
-    });
+    setSessionData((prev) => ({
+      ...prev,
+      carrito: [...prev.carrito, item],
+    }));
 
     addMessage(
       `✅ Agregado: ${item.DESCRIPCION} (${item.TALLA}) x${cantidad} = $${(
@@ -687,121 +628,307 @@ export default function ChatBot() {
     setSelectedTalla("");
     setCantidad(1);
   };
+
   // ===================================
-  //   MOSTRAR CARRITO (FORMATO EXACTO)
+  //            MOSTRAR CARRITO
   // ===================================
   const mostrarCarrito = () => {
-    const carrito = sessionData.carrito;
-
-    if (!carrito.length) {
-      addMessage("🛒 Tu carrito está vacío.", "bot");
+    if (sessionData.carrito.length === 0) {
+      addMessage("🛒 Tu carrito está vacío", "bot");
       return;
     }
 
-    let texto = "🛒 *Tu carrito actual:*\n\n";
+    let texto = "🛒 *TU CARRITO:*\n\n";
+    let subtotal = 0;
+    const metodo = sessionData.metodo_pago || "Contra entrega";
 
-    carrito.forEach((item, idx) => {
-      const precioUnit = calcularPrecioItem(item, sessionData.metodo_pago);
-      const subtotal = precioUnit * item.CANTIDAD;
+    sessionData.carrito.forEach((item, idx) => {
+      const precio = calcularPrecioItem(item, metodo);
+      const subItem = precio * item.CANTIDAD;
 
-      texto += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
-      texto += `Cantidad: ${item.CANTIDAD} → $${subtotal.toFixed(2)}\n\n`;
+      texto += `${idx + 1}. ${item.DESCRIPCION}\n`;
+      texto += `   Talla: ${item.TALLA} | Cant: ${
+        item.CANTIDAD
+      }\n   $${precio.toFixed(2)} x ${
+        item.CANTIDAD
+      } = $${subItem.toFixed(2)}\n\n`;
 
-      // Incentivo solo en carrito
-      const incentivo = calcularIncentivoCantidad(item, carrito);
-      if (incentivo) {
-        texto += incentivo + "\n\n";
-      }
+      subtotal += subItem;
     });
 
+    texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
     addMessage(texto, "bot");
-
-    addMessage("¿Qué deseas hacer ahora?", "bot", [
-      { label: "➕ Agregar más productos", value: "agregar_mas" },
-      { label: "🧾 Continuar al resumen", value: "continuar_resumen" },
-      { label: "🗑 Vaciar carrito", value: "vaciar_carrito" },
-    ]);
   };
 
   // ===================================
-  //   CÁLCULO TOTAL (SEGÚN MÉTODO PAGO)
-  // ===================================
-  const calcularTotalCarrito = (metodoPago) => {
-    return sessionData.carrito.reduce((sum, item) => {
-      const precio = calcularPrecioItem(item, metodoPago);
-      return sum + precio * item.CANTIDAD;
-    }, 0);
-  };
-
-  // ===================================
-  //   INCENTIVO TRANSFERENCIA EN TIEMPO REAL
-  //   (SE MUESTRA CUANDO EL BOT PIDE MÉTODO DE PAGO)
-  // ===================================
-  const mostrarIncentivoTransferencia = () => {
-    const totalNormal = calcularTotalCarrito("Efectivo");
-    const totalTransferencia = calcularTotalCarrito("Transferencia");
-
-    // si es igual, no mostrar incentivo
-    if (totalTransferencia >= totalNormal) return "";
-
-    return (
-      "💳 *Paga con transferencia y tu total baja a $" +
-      totalTransferencia.toFixed(2) +
-      `.*\n¡Aprovecha el mejor precio!`
-    );
-  };
-
-  // ===================================
-  //   MOSTRAR RESUMEN FINAL DETALLADO
+  //            MOSTRAR RESUMEN
   // ===================================
   const mostrarResumen = () => {
-    const carrito = sessionData.carrito;
+    const metodo = sessionData.metodo_pago || "Contra entrega";
 
-    if (!carrito.length) {
-      addMessage("🛒 Tu carrito está vacío.", "bot");
-      return;
-    }
+    const subtotal = sessionData.carrito.reduce((sum, item) => {
+      const precio = calcularPrecioItem(item, metodo);
+      return sum + precio * item.CANTIDAD;
+    }, 0);
 
-    let texto = "📦 *Resumen de tu pedido:*\n\n";
+    const total = subtotal + sessionData.costo_envio;
 
-    carrito.forEach((item, idx) => {
-      const precioUnit = calcularPrecioItem(item, sessionData.metodo_pago);
-      const subtotal = precioUnit * item.CANTIDAD;
+    let resumen = `📋 *RESUMEN DE TU PEDIDO*\n\n`;
+    resumen += `👤 ${sessionData.nombre}\n`;
+    resumen += `📱 ${sessionData.telefono}\n\n`;
 
-      texto += `*Producto #${idx + 1}*\n`;
-      texto += `Código interno: ${item.CODIGO_INTERNO}\n`;
-      texto += `Categoría: ${item.CATEGORIA}\n`;
-      texto += `Descripción: ${item.DESCRIPCION}\n`;
-      texto += `Color: ${item.COLOR}\n`;
-      texto += `Talla: ${item.TALLA}\n`;
-      texto += `Cantidad: ${item.CANTIDAD}\n`;
-      texto += `Precio: $${precioUnit.toFixed(2)} c/u\n`;
-      texto += `Subtotal: $${subtotal.toFixed(2)}\n\n`;
+    resumen += `📦 *Productos (${sessionData.carrito.length}):*\n`;
+    sessionData.carrito.forEach((item, idx) => {
+      const precio = calcularPrecioItem(item, metodo);
+      const subItem = precio * item.CANTIDAD;
+      resumen += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA}) x${
+        item.CANTIDAD
+      } → $${subItem.toFixed(2)}\n`;
     });
 
-    // ------ DATOS DE ENTREGA ------
-    texto += "📍 *Datos de entrega:*\n";
-    texto += `Departamento: ${sessionData.departamento}\n`;
-    texto += `Municipio: ${sessionData.municipio}\n`;
-    texto += `Referencia: ${sessionData.punto_referencia}\n`;
-    texto += `Tipo de entrega: ${sessionData.tipo_entrega}\n\n`;
+    resumen += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
 
-    // ------ MÉTODO DE PAGO ------
-    texto += "💰 *Método de pago:* " + sessionData.metodo_pago + "\n\n";
+    let tipoEnvioTexto = sessionData.tipo_entrega;
+    if (tipoEnvioTexto === "PERSONALIZADO") tipoEnvioTexto = "🏠 PERSONALIZADO";
+    if (tipoEnvioTexto === "PUNTO FIJO") tipoEnvioTexto = "📍 PUNTO FIJO";
+    if (tipoEnvioTexto === "CASILLERO") tipoEnvioTexto = "📦 CASILLERO";
 
-    // ------ TOTAL ------
-    const total = calcularTotalCarrito(sessionData.metodo_pago);
-    texto += `TOTAL A PAGAR: *$${total.toFixed(2)}*\n\n`;
+    resumen += `🚚 Envío (${tipoEnvioTexto}): $${sessionData.costo_envio.toFixed(
+      2
+    )}\n`;
+    resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
 
-    addMessage(texto, "bot");
+    resumen += `📍 ${sessionData.departamento} - ${sessionData.municipio}\n`;
 
-    addMessage("¿Deseas confirmar tu pedido?", "bot", [
-      { label: "✅ Sí, confirmar", value: "confirmar_pedido" },
-      { label: "🛒 Volver al carrito", value: "ver_carrito" },
+    if (sessionData.tipo_entrega === "PERSONALIZADO") {
+      resumen += `📌 ${sessionData.punto_referencia}\n`;
+    } else {
+      if (sessionData.encomiendista_nombre) {
+        resumen += `🚛 ${sessionData.encomiendista_nombre}\n`;
+      }
+      if (sessionData.punto_referencia) {
+        resumen += `📍 ${sessionData.punto_referencia}\n`;
+      }
+      if (sessionData.dia_entrega) {
+        resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+      }
+    }
+
+    resumen += `💳 ${sessionData.metodo_pago}\n\n`;
+    resumen += `¿Todo correcto?`;
+
+    addMessage(resumen, "bot", [
+      { label: "✅ Confirmar pedido", value: "confirmar_pedido" },
+      { label: "❌ Cancelar", value: "cancelar" },
     ]);
   };
+
   // ===================================
-  //             PROCESAR MENSAJES
+  //     SUBIR COMPROBANTE DESPUÉS
+  // ===================================
+  const subirComprobanteDespuesDeFactura = async (factura) => {
+    if (!sessionData.foto_comprobante_base64) return;
+    try {
+      await fetch(`${SCRIPT_URL}?route=uploadComprobante`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          factura,
+          base64: sessionData.foto_comprobante_base64,
+        }),
+      });
+      addMessage("📤 Tu comprobante fue guardado correctamente ✔️", "bot");
+    } catch (e) {
+      addMessage(
+        "⚠️ No se pudo guardar el comprobante. El asesor lo agregará manualmente.",
+        "bot"
+      );
+    }
+  };
+
+  // ===================================
+  //      CREAR PEDIDO + COMPROBANTE
+  // ===================================
+  const crearPedidoConComprobante = async () => {
+    const metodo = sessionData.metodo_pago || "Contra entrega";
+
+    const subtotal = sessionData.carrito.reduce((sum, item) => {
+      const precio = calcularPrecioItem(item, metodo);
+      return sum + precio * item.CANTIDAD;
+    }, 0);
+
+    const total = subtotal + sessionData.costo_envio;
+
+    // Recalcular precios por producto para enviar limpios al backend
+    const productos = sessionData.carrito.map((item) => {
+      const precio = calcularPrecioItem(item, metodo);
+      const subItem = precio * item.CANTIDAD;
+      return {
+        ...item,
+        PRECIO_APLICADO: precio,
+        SUBTOTAL_ITEM: subItem,
+      };
+    });
+
+    const pedido = {
+      telefono: sessionData.telefono,
+      nombre: sessionData.nombre,
+      departamento: sessionData.departamento,
+      municipio: sessionData.municipio,
+      direccion: sessionData.direccion,
+      punto_referencia: sessionData.punto_referencia,
+      metodo_pago: sessionData.metodo_pago,
+      tipo_entrega: sessionData.tipo_entrega,
+      encomiendista: sessionData.encomiendista,
+      costo_envio: sessionData.costo_envio,
+      subtotal,
+      descuento: 0,
+      total,
+      productos,
+    };
+
+    try {
+      const res = await fetch(`${SCRIPT_URL}?route=crearPedido`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pedido),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        addMessage(`✅ ¡Pedido #${data.factura} creado exitosamente!`, "bot");
+        setSessionData((prev) => ({
+          ...prev,
+          factura_generada: data.factura,
+        }));
+
+        await subirComprobanteDespuesDeFactura(data.factura);
+      } else {
+        addMessage(
+          "⚠️ Error al guardar en el sistema. Se enviará por WhatsApp.",
+          "bot"
+        );
+      }
+
+      enviarWhatsApp(subtotal, total);
+    } catch (e) {
+      addMessage(
+        "⚠️ No se pudo conectar con el sistema\nEnviando el pedido por WhatsApp...",
+        "bot"
+      );
+      enviarWhatsApp(subtotal, total);
+    }
+  };
+
+  // ===================================
+  //         FILE → BASE64
+  // ===================================
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = String(reader.result).split(",")[1];
+        resolve(base64);
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+
+    addMessage("📸 Recibiendo comprobante, procesando imagen...", "bot");
+
+    try {
+      const base64 = await fileToBase64(file);
+      setSessionData((prev) => ({
+        ...prev,
+        foto_comprobante_base64: base64,
+      }));
+
+      addMessage(
+        "✅ Comprobante recibido.\n\nAhora te muestro el resumen para confirmar tu pedido:",
+        "bot"
+      );
+
+      setSessionData((prev) => ({ ...prev, step: "confirmar" }));
+      mostrarResumen();
+    } catch (e) {
+      addMessage(
+        "⚠️ Hubo un error leyendo la imagen. Intenta subirla nuevamente.",
+        "bot"
+      );
+    }
+  };
+
+  // ===================================
+  //             WHATSAPP
+  // ===================================
+  const enviarWhatsApp = (subtotal, total) => {
+    const metodo = sessionData.metodo_pago || "Contra entrega";
+
+    let mensaje = `🛍️ *NUEVO PEDIDO - GyS Importadora*\n\n`;
+    mensaje += `👤 *Cliente:* ${sessionData.nombre}\n`;
+    mensaje += `📱 *Teléfono:* ${sessionData.telefono}\n\n`;
+
+    mensaje += `📦 *PRODUCTOS:*\n`;
+    sessionData.carrito.forEach((item, idx) => {
+      const precio = calcularPrecioItem(item, metodo);
+      const subItem = precio * item.CANTIDAD;
+      mensaje += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
+      mensaje += `   Cant: ${item.CANTIDAD} x $${precio.toFixed(
+        2
+      )} = $${subItem.toFixed(2)}\n`;
+    });
+
+    mensaje += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
+
+    let tipoTexto = sessionData.tipo_entrega;
+    if (tipoTexto === "PERSONALIZADO") tipoTexto = "🏠 PERSONALIZADO";
+    if (tipoTexto === "PUNTO FIJO") tipoTexto = "📍 PUNTO FIJO";
+    if (tipoTexto === "CASILLERO") tipoTexto = "📦 CASILLERO";
+
+    mensaje += `🚚 Envío (${tipoTexto}): $${sessionData.costo_envio.toFixed(
+      2
+    )}\n`;
+    mensaje += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
+
+    mensaje += `📍 *UBICACIÓN:*\n`;
+    mensaje += `${sessionData.departamento} - ${sessionData.municipio}\n`;
+
+    if (sessionData.tipo_entrega === "PERSONALIZADO") {
+      if (sessionData.punto_referencia) {
+        mensaje += `📌 Punto de referencia: ${sessionData.punto_referencia}\n`;
+      }
+    } else {
+      if (sessionData.encomiendista_nombre) {
+        mensaje += `🚛 ${sessionData.encomiendista_nombre}\n`;
+      }
+      if (sessionData.punto_referencia) {
+        mensaje += `📍 Punto: ${sessionData.punto_referencia}\n`;
+      }
+      if (sessionData.dia_entrega) {
+        mensaje += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
+      }
+    }
+
+    mensaje += `\n💳 *Pago:* ${sessionData.metodo_pago}\n\n`;
+    mensaje += `✨ _Pedido desde chatbot automático_`;
+
+    const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
+      mensaje
+    )}`;
+
+    addMessage("Abriendo WhatsApp para confirmar tu pedido... 📱", "bot");
+    setTimeout(() => {
+      window.open(url, "_blank");
+    }, 1000);
+  };
+
+  // ===================================
+  //          PROCESAR MENSAJES
   // ===================================
   const processMessage = async (userInput) => {
     addMessage(userInput, "user");
@@ -880,80 +1007,166 @@ export default function ChatBot() {
       return;
     }
 
-    if (input === "continuar_resumen") {
-      if (!session.carrito.length) {
-        addMessage("⚠️ Tu carrito está vacío.", "bot");
+    // 4) CONTINUAR PEDIDO
+    if (input === "continuar_pedido") {
+      if (session.carrito.length === 0) {
+        addMessage(
+          "⚠️ Tu carrito está vacío. Agrega productos primero.",
+          "bot"
+        );
         return;
       }
-      setSessionData((prev) => ({ ...prev, step: "tipo_entrega" }));
-      addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", [
-        { label: "🏠 Personalizado ($3.50)", value: "envio_personalizado" },
-        { label: "📍 Punto fijo", value: "envio_punto_fijo" },
-        { label: "📦 Casillero", value: "envio_casillero" },
-      ]);
+      setShowCarousel(false);
+      const totalProductos = session.carrito.reduce(
+        (sum, item) => sum + item.CANTIDAD,
+        0
+      );
+
+      if (totalProductos >= 3) {
+        setSessionData((prev) => ({ ...prev, step: "tipo_envio_3mas" }));
+        addMessage(
+          "📦 Tienes 3 o más productos\n\n¿Cómo deseas recibir tu pedido?",
+          "bot",
+          [
+            { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
+            { label: "📦 CASILLERO", value: "tipo_casillero" },
+          ]
+        );
+      } else {
+        setSessionData((prev) => ({ ...prev, step: "tipo_envio" }));
+        addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", [
+          { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
+          { label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" },
+          { label: "📦 CASILLERO", value: "tipo_casillero" },
+        ]);
+      }
       return;
     }
 
-    // ===================================
-    //        TIPO DE ENTREGA
-    // ===================================
-    if (input === "envio_personalizado") {
+    // 5) TIPO DE ENTREGA
+    if (input === "tipo_personalizado") {
       setSessionData((prev) => ({
         ...prev,
         tipo_entrega: "PERSONALIZADO",
         costo_envio: 3.5,
-        step: "pide_departamento",
+        step: "departamento_personalizado",
       }));
-
-      addMessage("🏠 Envío personalizado.\n\n📍 Selecciona tu departamento:", "bot",
+      addMessage(
+        "🏠 Envío PERSONALIZADO - $3.50\n\n📍 ¿De qué departamento eres?",
+        "bot",
         Object.keys(DEPARTAMENTOS_MUNICIPIOS).map((dep) => ({
           label: dep,
-          value: `dep_${dep}`,
+          value: `dep_pers_${dep}`,
         }))
       );
       return;
     }
 
-    if (input.startsWith("dep_") && session.step === "pide_departamento") {
-      const depText = input.replace("dep_", "");
-      const departamento = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
-        (d) => d.toLowerCase() === depText.toLowerCase()
+    if (input === "tipo_punto_fijo") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "PUNTO FIJO",
+        step: "cargando_puntos_fijos",
+      }));
+      addMessage("📍 Buscando puntos fijos disponibles... 🔍", "bot");
+      const resultado = await cargarEncomiendistas("PUNTO FIJO");
+      if (resultado.success && resultado.items.length > 0) {
+        setEncomiendaIndex(0);
+        setShowEncomiendaCarousel(true);
+        addMessage(
+          `✨ Encontré ${resultado.items.length} punto(s) fijo(s) disponible(s).\n\nUsa las flechas para navegar:`,
+          "bot"
+        );
+      } else {
+        addMessage("⚠️ No hay puntos fijos disponibles", "bot", [
+          {
+            label: "🏠 Cambiar a PERSONALIZADO",
+            value: "tipo_personalizado",
+          },
+          { label: "📦 Ver CASILLEROS", value: "tipo_casillero" },
+          { label: "📞 Contactar agente", value: "agente" },
+        ]);
+      }
+      return;
+    }
+
+    if (input === "tipo_casillero") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "CASILLERO",
+        step: "cargando_casilleros",
+      }));
+      addMessage("📦 Buscando casilleros disponibles... 🔍", "bot");
+      const resultado = await cargarEncomiendistas("CASILLERO");
+      if (resultado.success && resultado.items.length > 0) {
+        setEncomiendaIndex(0);
+        setShowEncomiendaCarousel(true);
+        addMessage(
+          `✨ Encontré ${resultado.items.length} casillero(s) disponible(s).\n\nUsa las flechas para navegar:`,
+          "bot"
+        );
+      } else {
+        addMessage("⚠️ No hay casilleros disponibles", "bot", [
+          {
+            label: "🏠 Cambiar a PERSONALIZADO",
+            value: "tipo_personalizado",
+          },
+          { label: "📍 Ver PUNTOS FIJOS", value: "tipo_punto_fijo" },
+          { label: "📞 Contactar agente", value: "agente" },
+        ]);
+      }
+      return;
+    }
+
+    // 6) PERSONALIZADO: DPTO / MUNICIPIO / REFERENCIA
+    if (input.startsWith("dep_pers_")) {
+      const departamentoInput = input.replace("dep_pers_", "");
+      const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
+        (k) => k.toLowerCase() === departamentoInput.toLowerCase()
       );
+      const departamento = departamentoKey || departamentoInput;
+      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
+
+      if (!municipios.length) {
+        addMessage(
+          `⚠️ No se encontraron municipios para ${departamentoInput}.`,
+          "bot",
+          [{ label: "📞 Contactar agente", value: "agente" }]
+        );
+        return;
+      }
 
       setSessionData((prev) => ({
         ...prev,
-        departamento: departamento,
-        step: "pide_municipio",
+        departamento,
+        step: "municipio_personalizado",
       }));
-
-      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento];
-
-      addMessage(`📍 ${departamento}\n\nSelecciona tu municipio:`, "bot",
-        municipios.map((m) => ({
-          label: m,
-          value: `mun_${m}`,
+      addMessage(
+        `${departamento} 📍\n\n¿De qué municipio?`,
+        "bot",
+        municipios.map((muni) => ({
+          label: muni,
+          value: `muni_pers_${muni}`,
         }))
       );
       return;
     }
 
-    if (input.startsWith("mun_") && session.step === "pide_municipio") {
-      const municipio = input.replace("mun_", "");
-
+    if (input.startsWith("muni_pers_")) {
+      const municipio = input.replace("muni_pers_", "");
       setSessionData((prev) => ({
         ...prev,
         municipio,
-        step: "pide_referencia",
+        step: "punto_referencia_personalizado",
       }));
-
       addMessage(
-        `📍 ${sessionData.departamento} - ${municipio}\n\nIngresa tu punto de referencia:`,
+        `📍 ${session.departamento} - ${municipio}\n\n¿Cuál es tu punto de referencia?\n(Ej: Frente a gasolinera Shell)`,
         "bot"
       );
       return;
     }
 
-    if (session.step === "pide_referencia") {
+    if (session.step === "punto_referencia_personalizado") {
       setSessionData((prev) => ({
         ...prev,
         punto_referencia: userInput.trim(),
@@ -962,132 +1175,455 @@ export default function ChatBot() {
         encomiendista_nombre: "Envío Personalizado",
         step: "metodo_pago",
       }));
-
-      // ----- INCENTIVO TRANSFERENCIA -----
-      const incentivo = mostrarIncentivoTransferencia();
-
       addMessage(
-        `Perfecto 🙌\n\nSelecciona tu método de pago:\n\n${incentivo}`,
+        "🏠 Punto de referencia registrado\n💵 Costo de envío: $3.50\n\n¿Cómo deseas pagar?",
         "bot",
         [
-          { label: "💵 Contra entrega", value: "pago_efectivo" },
-          { label: "💳 Transferencia", value: "pago_transferencia" },
+          { label: "💵 Contra entrega", value: "contra_entrega" },
+          { label: "💳 Transferencia", value: "transferencia" },
         ]
       );
       return;
     }
 
-    // ===================================
-    //          MÉTODO DE PAGO
-    // ===================================
-    if (input === "pago_efectivo") {
+    // 7) MÉTODO DE PAGO
+    if (input === "contra_entrega") {
       setSessionData((prev) => ({
         ...prev,
-        metodo_pago: "Efectivo",
-        step: "resumen_final",
+        metodo_pago: "Contra entrega",
+        foto_comprobante_base64: "",
+        step: "confirmar",
       }));
       mostrarResumen();
       return;
     }
 
-    if (input === "pago_transferencia") {
+    if (input === "transferencia") {
       setSessionData((prev) => ({
         ...prev,
         metodo_pago: "Transferencia",
-        step: "resumen_final",
+        step: "esperando_comprobante",
       }));
+      addMessage(
+        "💳 Has elegido *Transferencia*.\n\n📸 Puedes subir *la foto del comprobante* usando el botón 📷 de abajo.\n\nSi aún no la tienes, puedes continuar sin subirla.",
+        "bot",
+        [
+          { label: "📷 Subir comprobante ahora", value: "subir_ahora" },
+          { label: "➡️ Enviarlo después", value: "subir_despues" },
+        ]
+      );
+      return;
+    }
+
+    if (input === "subir_ahora") {
+      addMessage(
+        "Pulsa el botón 📷 de abajo para seleccionar la foto del comprobante.",
+        "bot"
+      );
+      return;
+    }
+
+    if (input === "subir_despues") {
+      // No hay comprobante todavía, pero dejamos continuar
+      setSessionData((prev) => ({
+        ...prev,
+        step: "confirmar",
+      }));
+      addMessage(
+        "Perfecto 👍 Podrás enviar el comprobante después.\n\nTe muestro el resumen:",
+        "bot"
+      );
       mostrarResumen();
       return;
     }
 
-    // ===================================
-    //      CONFIRMACIÓN DEL PEDIDO
-    // ===================================
+    // 8) CONFIRMAR / CANCELAR
     if (input === "confirmar_pedido") {
-      crearPedidoConComprobante();
+      await crearPedidoConComprobante();
       return;
     }
 
-    addMessage("No entendí tu opción 😅 intenta nuevamente.", "bot");
-  };
-
-  // ===================================
-  //   GUARDAR PEDIDO + ENVIAR WHATSAPP
-  // ===================================
-  const crearPedidoConComprobante = async () => {
-    const metodo = sessionData.metodo_pago;
-    const subtotal = calcularTotalCarrito(metodo);
-    const totalFinal = subtotal + sessionData.costo_envio;
-
-    const productosLimpios = sessionData.carrito.map((item) => {
-      const precio = calcularPrecioItem(item, metodo);
-      return {
-        ...item,
-        PRECIO_APLICADO: precio,
-        SUBTOTAL_ITEM: precio * item.CANTIDAD,
-      };
-    });
-
-    const pedido = {
-      telefono: sessionData.telefono,
-      nombre: sessionData.nombre,
-      departamento: sessionData.departamento,
-      municipio: sessionData.municipio,
-      referencia: sessionData.punto_referencia,
-      tipo_entrega: sessionData.tipo_entrega,
-      metodo_pago: metodo,
-      costo_envio: sessionData.costo_envio,
-      total: totalFinal,
-      productos: productosLimpios,
-    };
-
-    try {
-      await fetch(`${SCRIPT_URL}?route=crearPedido`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pedido),
-      });
-    } catch (e) {
-      console.log("Error guardando en Sheets, enviando solo a WhatsApp");
+    if (input === "cancelar") {
+      addMessage(
+        "❌ Pedido cancelado. Si deseas, puedes empezar de nuevo.",
+        "bot"
+      );
+      return;
     }
 
-    enviarWhatsApp(totalFinal);
+    // Default
+    addMessage("No entendí esa opción 😅 Usa los botones disponibles.", "bot");
   };
 
   // ===================================
-  //         ENVIAR A WHATSAPP
+  //      HANDLERS DE INPUT / BOTONES
   // ===================================
-  const enviarWhatsApp = (totalFinal) => {
-    let msg = `🛍️ *Nuevo pedido – GyS Importadora*\n\n`;
+  const handleSend = () => {
+    if (!input.trim()) return;
+    processMessage(input);
+    setInput("");
+  };
 
-    msg += `👤 Cliente: ${sessionData.nombre}\n`;
-    msg += `📱 Teléfono: ${sessionData.telefono}\n\n`;
+  const handleOptionClick = (value) => {
+    processMessage(value);
+  };
 
-    msg += `📦 *Productos:*\n`;
+  const filtered = getFilteredCatalog();
+  const currentProduct = filtered[carouselIndex];
 
-    sessionData.carrito.forEach((item, idx) => {
-      const precio = calcularPrecioItem(item, sessionData.metodo_pago);
-      const sub = precio * item.CANTIDAD;
+  // ===================================
+  //               UI
+  // ===================================
+  return (
+    <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 to-purple-50">
+      <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-4 shadow-lg">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <ShoppingBag className="w-8 h-8" />
+            <div>
+              <h1 className="text-xl font-bold">GyS Importadora</h1>
+              <p className="text-sm opacity-90">Ropa y accesorios 💚</p>
+            </div>
+          </div>
+          {sessionData.carrito.length > 0 && (
+            <div className="bg-white/20 px-3 py-1 rounded-full text-sm">
+              🛒 {sessionData.carrito.length}
+            </div>
+          )}
+        </div>
+      </div>
 
-      msg += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
-      msg += `   Cant: ${item.CANTIDAD} x $${precio.toFixed(
-        2
-      )} = $${sub.toFixed(2)}\n`;
-    });
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-4xl mx-auto w-full">
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`flex ${
+              msg.sender === "user" ? "justify-end" : "justify-start"
+            }`}
+          >
+            <div
+              className={`max-w-[80%] ${
+                msg.sender === "user"
+                  ? "bg-purple-500 text-white"
+                  : "bg-white text-gray-800"
+              } rounded-2xl px-4 py-3 shadow-md`}
+            >
+              <p className="whitespace-pre-wrap">{msg.text}</p>
+              {msg.options && (
+                <div
+                  className={`mt-3 ${
+                    msg.options.length > 6 ? "max-h-96 overflow-y-auto" : ""
+                  }`}
+                >
+                  <div
+                    className={`grid ${
+                      msg.options.length > 6 ? "grid-cols-2" : "grid-cols-1"
+                    } gap-2`}
+                  >
+                    {msg.options.map((opt, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleOptionClick(opt.value)}
+                        className="w-full bg-gradient-to-r from-pink-400 to-purple-500 text-white px-4 py-2 rounded-lg hover:from-pink-500 hover:to-purple-600 transition-all text-sm font-medium text-left"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
 
-    msg += `\n💰 Total: $${totalFinal.toFixed(2)}\n`;
+        {loadingEncomiendas && (
+          <div className="flex justify-center items-center">
+            <div className="bg-white rounded-xl shadow-lg p-6 flex items-center gap-3">
+              <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+              <span className="text-gray-700">Buscando opciones...</span>
+            </div>
+          </div>
+        )}
 
-    msg += `📍 ${sessionData.departamento} - ${sessionData.municipio}\n`;
-    msg += `Referencia: ${sessionData.punto_referencia}\n\n`;
+        {showCarousel && (
+          <div className="bg-white rounded-xl shadow-lg p-4 mx-auto max-w-md">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-bold text-lg">🛍️ Catálogo</h3>
+              <select
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setCarouselIndex(0);
+                  cargarCatalogo(e.target.value);
+                }}
+                className="px-3 py-1 border rounded-lg text-sm"
+              >
+                <option value="todos">Todos</option>
+                <option value="pantalones">Pantalones</option>
+                <option value="blusas">Blusas</option>
+                <option value="zapatos">Zapatos</option>
+              </select>
+            </div>
 
-    msg += `💳 Pago: ${sessionData.metodo_pago}\n`;
+            {loadingCatalog ? (
+              <div className="flex justify-center items-center h-64">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+              </div>
+            ) : currentProduct ? (
+              <div className="relative">
+                <img
+                  src={(() => {
+                    let url =
+                      currentProduct.FOTO ||
+                      currentProduct["FOTO LINK"] ||
+                      "https://via.placeholder.com/300";
+                    if (url.includes("drive.google.com/uc?export=view")) {
+                      const id = url.split("id=")[1];
+                      if (id) {
+                        url = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
+                      }
+                    }
+                    return url;
+                  })()}
+                  alt={currentProduct.DESCRIPCION}
+                  className="w-full h-64 object-cover rounded-lg mb-3"
+                  onError={(e) => {
+                    e.target.src =
+                      "https://via.placeholder.com/300?text=Sin+Imagen";
+                  }}
+                />
 
-    msg += `\n✨ Pedido generado automáticamente desde el chat\n`;
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-lg capitalize">
+                    {currentProduct.DESCRIPCION}
+                  </h4>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">
+                      Color: {currentProduct.COLOR}
+                    </span>
+                    <span className="font-bold text-purple-600 text-lg">
+                      ${currentProduct.PRECIO_UNIDAD}
+                    </span>
+                  </div>
 
-    const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
-      msg
-    )}`;
+                  {currentProduct.TALLAS_DISPONIBLES &&
+                    currentProduct.TALLAS_DISPONIBLES.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Talla:
+                        </label>
+                        <select
+                          value={selectedTalla}
+                          onChange={(e) => setSelectedTalla(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg"
+                        >
+                          <option value="">Selecciona talla</option>
+                          {currentProduct.TALLAS_DISPONIBLES.map((t, i) => (
+                            <option key={i} value={t.etiqueta}>
+                              {t.etiqueta} (Stock: {t.stock})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
-    addMessage("Abriendo WhatsApp… 📱", "bot");
-    setTimeout(() => window.open(url, "_blank"), 600);
-  }; }
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Cantidad:
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={cantidad}
+                      onChange={(e) =>
+                        setCantidad(parseInt(e.target.value) || 1)
+                      }
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+
+                  <button
+                    onClick={agregarAlCarrito}
+                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Package className="w-5 h-5" />
+                    Agregar al carrito
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => handleCarouselNav("prev")}
+                  className="absolute left-2 top-28 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  onClick={() => handleCarouselNav("next")}
+                  className="absolute right-2 top-28 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+
+                <div className="text-center text-sm text-gray-500 mt-2">
+                  {carouselIndex + 1} / {filtered.length}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No hay productos disponibles
+              </div>
+            )}
+          </div>
+        )}
+
+        {showEncomiendaCarousel && encomiendistas.length > 0 && (
+          <div className="bg-white rounded-xl shadow-lg p-4 mx-auto max-w-md">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-bold text-lg">
+                {sessionData.tipo_entrega === "PUNTO FIJO"
+                  ? "📍 Puntos Fijos"
+                  : "📦 Casilleros"}
+              </h3>
+            </div>
+            {(() => {
+              const enc = encomiendistas[encomiendaIndex];
+              if (!enc) return null;
+
+              let fotoUrl = enc.FOTO_REFERENCIA || "";
+              if (fotoUrl.includes("drive.google.com/uc?export=view")) {
+                const id = fotoUrl.split("id=")[1];
+                if (id) {
+                  fotoUrl = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
+                }
+              }
+
+              return (
+                <div className="relative">
+                  {fotoUrl && (
+                    <img
+                      src={fotoUrl}
+                      alt={enc.ENCOMIENDISTA}
+                      className="w-full h-48 object-cover rounded-lg mb-3"
+                      onError={(e) => {
+                        e.target.src =
+                          "https://via.placeholder.com/300?text=Sin+Foto";
+                      }}
+                    />
+                  )}
+
+                  <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
+                    <h4 className="font-bold text-xl text-purple-600">
+                      {enc.ENCOMIENDISTA}
+                    </h4>
+
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-gray-500" />
+                        <span className="font-semibold">
+                          {enc.DEPARTAMENTO} - {enc.MUNICIPIO}
+                        </span>
+                      </div>
+                      {enc.PUNTO_REFERENCIA && (
+                        <div className="flex items-start gap-2">
+                          <Package className="w-4 h-4 text-gray-500 mt-0.5" />
+                          <span>{enc.PUNTO_REFERENCIA}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-green-600" />
+                        <span className="font-bold text-green-600 text-lg">
+                          ${enc.COSTO_ENVIO}
+                        </span>
+                      </div>
+                      {enc.DIA_ENTREGA && (
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-gray-500" />
+                          <span>{enc.DIA_ENTREGA}</span>
+                        </div>
+                      )}
+                      {enc.HORA_ENTREGA && (
+                        <div className="flex items-center gap-2 ml-6">
+                          <span className="text-gray-600">
+                            ⏰ {enc.HORA_ENTREGA}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={seleccionarEncomienda}
+                      className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 mt-4"
+                    >
+                      <Truck className="w-5 h-5" />
+                      Elegir esta opción
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => handleEncomiendaNav("prev")}
+                    className="absolute left-2 top-20 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={() => handleEncomiendaNav("next")}
+                    className="absolute right-2 top-20 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+
+                  <div className="text-center text-sm text-gray-500 mt-2">
+                    Opción {encomiendaIndex + 1} de {encomiendistas.length}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* FOOTER INPUT */}
+      <div className="bg-white border-t p-4 shadow-lg">
+        <div className="max-w-4xl mx-auto flex gap-2 items-center">
+          {/* Input de texto */}
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            placeholder="Escribe tu mensaje..."
+            className="flex-1 px-4 py-3 border-2 border-purple-200 rounded-full focus:outline-none focus:border-purple-500"
+          />
+
+          {/* Input de archivo oculto */}
+          <input
+            id="fileInput"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleFileUpload(e.target.files[0])}
+          />
+
+          {/* Botón cámara */}
+          <label
+            htmlFor="fileInput"
+            className="bg-purple-500 text-white p-3 rounded-full cursor-pointer hover:bg-purple-600 transition-all"
+          >
+            📷
+          </label>
+
+          {/* Botón enviar */}
+          <button
+            onClick={handleSend}
+            className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-3 rounded-full hover:from-pink-600 hover:to-purple-700 transition-all"
+          >
+            <Send className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
