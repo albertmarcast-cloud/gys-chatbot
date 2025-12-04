@@ -663,14 +663,12 @@ export default function ChatBot( ) {
       return {
         ...prev,
         carrito: newCarrito,
+        step: "menu_flotante", // Nuevo paso para activar la barra flotante
       };
     });
 
-    addMessage("¿Qué deseas hacer?", "bot", [
-      { label: "➕ Agregar más productos", value: "agregar_mas" },
-      { label: "🛒 Ver mi carrito", value: "ver_carrito" },
-      { label: "✅ Continuar con el pedido", value: "continuar_pedido" },
-    ]);
+    // Los botones de acción se manejarán con la barra flotante
+    addMessage("¿Qué deseas hacer?", "bot"); // Mensaje simple para indicar que se esperan acciones
 
     setSelectedTalla("");
     setCantidad(1);
@@ -821,18 +819,19 @@ export default function ChatBot( ) {
       resumen += `   Cantidad: ${item.CANTIDAD} → $${subItem.toFixed(2)}\n\n`;
     });
 
-    resumen += `\n💰 subtotal: $${subtotal.toFixed(2)}\n`;
+    resumen += `💰 subtotal: $${subtotal.toFixed(2)}\n`;
+    resumen += `💵 costo_envio: $${sessionData.costo_envio.toFixed(2)}\n\n`;
+    resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
 
+    // DETALLES DEL ENVÍO (Nuevo orden solicitado)
+    resumen += `*DETALLES DEL ENVÍO:*\n\n`;
+    
     let tipoEnvioTexto = sessionData.tipo_entrega;
     if (tipoEnvioTexto === "PERSONALIZADO") tipoEnvioTexto = "🏠 PERSONALIZADO";
     if (tipoEnvioTexto === "PUNTO FIJO") tipoEnvioTexto = "📍 PUNTO FIJO";
     if (tipoEnvioTexto === "CASILLERO") tipoEnvioTexto = "📦 CASILLERO";
     if (tipoEnvioTexto === "RETIRO EN TIENDA") tipoEnvioTexto = "🏪 RETIRO EN TIENDA";
 
-    resumen += `💵 costo_envio: $${sessionData.costo_envio.toFixed(2)}\n\n`;
-
-    // DETALLES DEL ENVÍO (Nuevo orden solicitado)
-    resumen += `*DETALLES DEL ENVÍO:*\n\n`;
     resumen += `🚚 envío: ${tipoEnvioTexto}\n`;
     
     if (sessionData.tipo_entrega !== "RETIRO EN TIENDA") {
@@ -861,8 +860,6 @@ export default function ChatBot( ) {
 
     resumen += `💳 método_pago: ${sessionData.metodo_pago}\n\n`;
 
-    // Método de pago ordenado y claro (siempre al final)
-    resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
     resumen += `¿Todo correcto?`;
 
     addMessage(resumen, "bot", [
@@ -1139,6 +1136,7 @@ export default function ChatBot( ) {
       setShowCarousel(true);
       setCarouselIndex(0);
       cargarCatalogo(selectedCategory);
+      setSessionData((prev) => ({ ...prev, step: "menu_flotante" })); // Activar barra flotante
       return;
     }
 
@@ -1152,6 +1150,7 @@ export default function ChatBot( ) {
       return;
     }
 
+    // Los botones de acción se manejarán con la barra flotante
     if (input === "agregar_mas") {
       setShowCarousel(true);
       return;
@@ -1159,6 +1158,7 @@ export default function ChatBot( ) {
 
     if (input === "ver_carrito") {
       mostrarCarrito();
+      setSessionData((prev) => ({ ...prev, step: "menu_flotante" })); // Mantener barra flotante después de ver carrito
       return;
     }
 
@@ -1172,6 +1172,8 @@ export default function ChatBot( ) {
         return;
       }
       setShowCarousel(false);
+      setSessionData((prev) => ({ ...prev, step: "continuar_pedido_flotante" })); // Desactivar FAB
+
       const totalProductos = session.carrito.reduce(
         (sum, item) => sum + item.CANTIDAD,
         0
@@ -1461,6 +1463,18 @@ export default function ChatBot( ) {
     processMessage(value);
   };
 
+  const handleCarouselNav = (direction) => {
+    const filtered = getFilteredCatalog();
+    if (!filtered.length) return;
+    if (direction === "next") {
+      setCarouselIndex((prev) => (prev + 1) % filtered.length);
+    } else {
+      setCarouselIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
+    }
+    setSelectedTalla("");
+    setCantidad(1);
+  };
+
   const filtered = getFilteredCatalog();
   const currentProduct = filtered[carouselIndex];
 
@@ -1486,7 +1500,7 @@ export default function ChatBot( ) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-4xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-4xl mx-auto w-full pb-20">
         {messages.map((msg, idx) => (
           <div
             key={idx}
@@ -1777,6 +1791,34 @@ export default function ChatBot( ) {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* BARRA DE ACCIONES FLOTANTE (FAB) */}
+      {(sessionData.step === "menu_flotante" || sessionData.step === "menu") && (
+        <div className="fixed bottom-20 left-0 right-0 z-10">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="bg-white p-3 rounded-xl shadow-2xl flex justify-around gap-2 border border-purple-200">
+              <button
+                onClick={() => handleOptionClick("agregar_mas")}
+                className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:from-pink-600 hover:to-purple-700 transition-all"
+              >
+                ➕ Agregar más
+              </button>
+              <button
+                onClick={() => handleOptionClick("ver_carrito")}
+                className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-purple-600 transition-all"
+              >
+                🛒 Ver Carrito
+              </button>
+              <button
+                onClick={() => handleOptionClick("continuar_pedido")}
+                className="flex-1 bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-green-600 transition-all"
+              >
+                ✅ Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FOOTER INPUT */}
       <div className="bg-white border-t p-4 shadow-lg">
