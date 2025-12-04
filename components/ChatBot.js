@@ -563,102 +563,61 @@ export default function ChatBot() {
   // ===================================
   //     AGREGAR PRODUCTO AL CARRITO
   // ===================================
-  const agregarAlCarrito = () => {
-    const filtered = getFilteredCatalog();
-    const currentProduct = filtered[carouselIndex];
-    if (!currentProduct) return;
-
-    if (!selectedTalla && currentProduct.TALLAS_DISPONIBLES?.length > 0) {
-      addMessage("⚠️ Por favor selecciona una talla", "bot");
-      return;
-    }
-
-    // Precio preliminar solo para mostrar (se recalcula luego según método de pago)
-    const precioPre = calcularPrecioPreview(currentProduct, cantidad);
-
-    const item = {
-      CODIGO_INTERNO: currentProduct.CODIGO_INTERNO,
-      CODIGO: currentProduct.CODIGO,
-      CATEGORIA: currentProduct.CATEGORIA,
-      DESCRIPCION: currentProduct.DESCRIPCION,
-      TALLA: selectedTalla || currentProduct.TALLA_SIMPLE || "N/A",
-      COLOR: currentProduct.COLOR,
-      CANTIDAD: cantidad,
-
-      // Precios normales
-      PRECIO_UNIDAD: currentProduct.PRECIO_UNIDAD,
-      PRECIO_PAR: currentProduct.PRECIO_PAR,
-      PRECIO_MEDIADOCENA: currentProduct.PRECIO_MEDIADOCENA,
-      PRECIO_DOCENA: currentProduct.PRECIO_DOCENA,
-      PRECIO_CAJA_MAYOR30: currentProduct.PRECIO_CAJA_MAYOR30,
-
-      // Precios depósito (transferencia)
-      PRECIO_UNIDAD_DEPOSITO: currentProduct.PRECIO_UNIDAD_DEPOSITO,
-      PRECIO_PAR_DEPOSITO: currentProduct.PRECIO_PAR_DEPOSITO,
-      PRECIO_MEDIADOCENA_DEPOSITO: currentProduct.PRECIO_MEDIADOCENA_DEPOSITO,
-      PRECIO_DOCENA_DEPOSITO: currentProduct.PRECIO_DOCENA_DEPOSITO,
-      PRECIO_CAJA_MAYOR30_DEPOSITO: currentProduct.PRECIO_CAJA_MAYOR30_DEPOSITO,
-
-      // Pre-cálculo (se volverá a calcular según método de pago real)
-      PRECIO_UNITARIO: currentProduct.PRECIO_UNIDAD,
-      PRECIO_APLICADO: precioPre,
-      DESCUENTO_POR_CANTIDAD: 0,
-      SUBTOTAL_ITEM: precioPre * cantidad,
-      FOTO: currentProduct.FOTO || "",
-    };
-
-    setSessionData((prev) => ({
-      ...prev,
-      carrito: [...prev.carrito, item],
-    }));
-
-    addMessage(
-      `✅ Agregado: ${item.DESCRIPCION} (${item.TALLA}) x${cantidad} = $${(
-        precioPre * cantidad
-      ).toFixed(2)}`,
-      "bot"
-    );
-
-    addMessage("¿Qué deseas hacer?", "bot", [
-      { label: "➕ Agregar más productos", value: "agregar_mas" },
-      { label: "🛒 Ver mi carrito", value: "ver_carrito" },
-      { label: "✅ Continuar con el pedido", value: "continuar_pedido" },
-    ]);
-
-    setSelectedTalla("");
-    setCantidad(1);
-  };
-
-  // ===================================
-  //            MOSTRAR CARRITO
-  // ===================================
   const mostrarCarrito = () => {
-    if (sessionData.carrito.length === 0) {
-      addMessage("🛒 Tu carrito está vacío", "bot");
-      return;
+  if (sessionData.carrito.length === 0) {
+    addMessage("🛒 Tu carrito está vacío", "bot");
+    return;
+  }
+
+  let texto = "🛒 *TU CARRITO:*\n\n";
+  const metodo = sessionData.metodo_pago || "Contra entrega";
+
+  // PARA INDICAR INCENTIVOS — agrupado por categoría + precio unidad
+  const conteoCategorias = {};
+
+  sessionData.carrito.forEach((item, idx) => {
+    const precio = calcularPrecioItem(item, metodo);
+    const subItem = precio * item.CANTIDAD;
+
+    // Línea principal del producto
+    texto += `*${idx + 1}. ${item.DESCRIPCION}*\n`;
+    texto += `Código interno: ${item.CODIGO_INTERNO}\n`;
+    texto += `Categoría: ${item.CATEGORIA}\n`;
+    texto += `Color: ${item.COLOR}\n`;
+    texto += `Talla: ${item.TALLA}\n`;
+    texto += `Cantidad: ${item.CANTIDAD}\n`;
+    texto += `Precio: $${precio.toFixed(2)} c/u\n`;
+    texto += `Subtotal: $${subItem.toFixed(2)}\n`;
+
+    // CONTAR PARA INCENTIVOS
+    const key = `${item.CATEGORIA}_${precio}`;
+    if (!conteoCategorias[key]) conteoCategorias[key] = 0;
+    conteoCategorias[key] += item.CANTIDAD;
+
+    // CALCULAR INCENTIVO
+    const totalCant = conteoCategorias[key];
+    const faltan6 = 6 - totalCant;
+
+    if (totalCant < 6 && faltan6 > 0 && faltan6 <= 3) {
+      texto += `💡 *Aprovecha*\n`;
+      texto += `Solo *${faltan6} pieza(s)* más para llegar a *media docena*.\n`;
+      texto += `¡El precio bajará automáticamente a precio especial! 🔥\n`;
     }
 
-    let texto = "🛒 *TU CARRITO:*\n\n";
-    let subtotal = 0;
-    const metodo = sessionData.metodo_pago || "Contra entrega";
+    texto += `\n`; // espacio entre productos
+  });
 
-    sessionData.carrito.forEach((item, idx) => {
-      const precio = calcularPrecioItem(item, metodo);
-      const subItem = precio * item.CANTIDAD;
+  // Calcular subtotal global
+  const subtotal = sessionData.carrito.reduce((sum, item) => {
+    const p = calcularPrecioItem(item, metodo);
+    return sum + p * item.CANTIDAD;
+  }, 0);
 
-      texto += `${idx + 1}. ${item.DESCRIPCION}\n`;
-      texto += `   Talla: ${item.TALLA} | Cant: ${
-        item.CANTIDAD
-      }\n   $${precio.toFixed(2)} x ${
-        item.CANTIDAD
-      } = $${subItem.toFixed(2)}\n\n`;
+  texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
 
-      subtotal += subItem;
-    });
+  addMessage(texto, "bot");
+};
 
-    texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
-    addMessage(texto, "bot");
-  };
 
   // ===================================
   //            MOSTRAR RESUMEN
