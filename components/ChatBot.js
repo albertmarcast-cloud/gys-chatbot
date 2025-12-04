@@ -680,10 +680,14 @@ export default function ChatBot( ) {
   const mostrarCarrito = () => {
     if (sessionData.carrito.length === 0) {
       addMessage("🛒 Tu carrito está vacío", "bot");
+      setShowCarousel(false); // Ocultar catálogo si el carrito está vacío
       return;
     }
 
+    setShowCarousel(false); // Ocultar catálogo para que el scroll funcione correctamente
+
     let texto = "🛒 *TU CARRITO:*\n\n";
+
     let subtotal = 0;
     const metodo = sessionData.metodo_pago || "Contra entrega";
     const incentivos = {}; // Para el punto 2.B
@@ -1150,9 +1154,9 @@ export default function ChatBot( ) {
       return;
     }
 
-    // Los botones de acción se manejarán con la barra flotante
     if (input === "agregar_mas") {
       setShowCarousel(true);
+      setSessionData((prev) => ({ ...prev, step: "menu_flotante" })); // Asegurar que el FAB esté visible
       return;
     }
 
