@@ -558,66 +558,38 @@ export default function ChatBot() {
     if (cant >= 6) return precioMedia || precioUnidad;
     if (cant >= 2) return precioPar || precioUnidad;
     return precioUnidad;
-  }
+  };
 
   // ===================================
   //     AGREGAR PRODUCTO AL CARRITO
   // ===================================
   const mostrarCarrito = () => {
-  if (sessionData.carrito.length === 0) {
-    addMessage("🛒 Tu carrito está vacío", "bot");
-    return;
-  }
-
-  let texto = "🛒 *TU CARRITO:*\n\n";
-  const metodo = sessionData.metodo_pago || "Contra entrega";
-
-  // PARA INDICAR INCENTIVOS — agrupado por categoría + precio unidad
-  const conteoCategorias = {};
-
-  sessionData.carrito.forEach((item, idx) => {
-    const precio = calcularPrecioItem(item, metodo);
-    const subItem = precio * item.CANTIDAD;
-
-    // Línea principal del producto
-    texto += `*${idx + 1}. ${item.DESCRIPCION}*\n`;
-    texto += `Código interno: ${item.CODIGO_INTERNO}\n`;
-    texto += `Categoría: ${item.CATEGORIA}\n`;
-    texto += `Color: ${item.COLOR}\n`;
-    texto += `Talla: ${item.TALLA}\n`;
-    texto += `Cantidad: ${item.CANTIDAD}\n`;
-    texto += `Precio: $${precio.toFixed(2)} c/u\n`;
-    texto += `Subtotal: $${subItem.toFixed(2)}\n`;
-
-    // CONTAR PARA INCENTIVOS
-    const key = `${item.CATEGORIA}_${precio}`;
-    if (!conteoCategorias[key]) conteoCategorias[key] = 0;
-    conteoCategorias[key] += item.CANTIDAD;
-
-    // CALCULAR INCENTIVO
-    const totalCant = conteoCategorias[key];
-    const faltan6 = 6 - totalCant;
-
-    if (totalCant < 6 && faltan6 > 0 && faltan6 <= 3) {
-      texto += `💡 *Aprovecha*\n`;
-      texto += `Solo *${faltan6} pieza(s)* más para llegar a *media docena*.\n`;
-      texto += `¡El precio bajará automáticamente a precio especial! 🔥\n`;
+    if (sessionData.carrito.length === 0) {
+      addMessage("🛒 Tu carrito está vacío", "bot");
+      return;
     }
 
-    texto += `\n`; // espacio entre productos
-  });
+    let texto = "🛒 *TU CARRITO:*\n\n";
+    let subtotal = 0;
+    const metodo = sessionData.metodo_pago || "Contra entrega";
 
-  // Calcular subtotal global
-  const subtotal = sessionData.carrito.reduce((sum, item) => {
-    const p = calcularPrecioItem(item, metodo);
-    return sum + p * item.CANTIDAD;
-  }, 0);
+    sessionData.carrito.forEach((item, idx) => {
+      const precio = calcularPrecioItem(item, metodo);
+      const subItem = precio * item.CANTIDAD;
 
-  texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
+      texto += `${idx + 1}. ${item.DESCRIPCION}\n`;
+      texto += `   Talla: ${item.TALLA} | Cant: ${
+        item.CANTIDAD
+      }\n   $${precio.toFixed(2)} x ${
+        item.CANTIDAD
+      } = $${subItem.toFixed(2)}\n\n`;
 
-  addMessage(texto, "bot");
-}
+      subtotal += subItem;
+    });
 
+    texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
+    addMessage(texto, "bot");
+  };
 
   // ===================================
   //            MOSTRAR RESUMEN
