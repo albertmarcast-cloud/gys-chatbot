@@ -558,7 +558,7 @@ export default function ChatBot() {
     if (cant >= 6) return precioMedia || precioUnidad;
     if (cant >= 2) return precioPar || precioUnidad;
     return precioUnidad;
-  };
+  }
 
   // ===================================
   //     AGREGAR PRODUCTO AL CARRITO
@@ -616,7 +616,7 @@ export default function ChatBot() {
   texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
 
   addMessage(texto, "bot");
-};
+}
 
 
   // ===================================
