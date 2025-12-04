@@ -850,6 +850,7 @@ export default function ChatBot( ) {
     
     if (sessionData.tipo_entrega !== "RETIRO EN TIENDA") {
       resumen += `📍 departamento: ${sessionData.departamento}\n`;
+      
       let ubicacionAgrupada = sessionData.municipio;
       if (sessionData.punto_referencia) {
         ubicacionAgrupada += ` - ${sessionData.punto_referencia}`;
@@ -1088,9 +1089,8 @@ export default function ChatBot( ) {
      )}`;
 
     addMessage("Abriendo WhatsApp para confirmar tu pedido... 📱", "bot");
-    setTimeout(() => {
-      window.open(url, "_blank");
-    }, 1000);
+    // Abrir inmediatamente para máxima compatibilidad con iOS/móviles
+    window.open(url, "_blank");
   };
 
   // ===================================
