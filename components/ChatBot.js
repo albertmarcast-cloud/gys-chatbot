@@ -1090,4 +1090,4 @@ export default function ChatBot() {
 
     addMessage("Abriendo WhatsApp… 📱", "bot");
     setTimeout(() => window.open(url, "_blank"), 600);
-  };
+  }; }
