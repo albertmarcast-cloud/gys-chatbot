@@ -352,6 +352,7 @@ export default function ChatBot( ) {
   const [categoriasDinamicas, setCategoriasDinamicas] = useState([]);
   const [selectedTalla, setSelectedTalla] = useState("");
   const [cantidad, setCantidad] = useState(1);
+  const [toastMessage, setToastMessage] = useState(null); // Nuevo estado para el Toast
 
   const messagesEndRef = useRef(null);
 
@@ -362,6 +363,16 @@ export default function ChatBot( ) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Lógica para ocultar el Toast después de 3 segundos
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
 
   useEffect(() => {
     addMessage(
@@ -581,7 +592,7 @@ export default function ChatBot( ) {
     if (!currentProduct) return;
 
     if (!selectedTalla && currentProduct.TALLAS_DISPONIBLES?.length > 0) {
-      addMessage("⚠️ Por favor selecciona una talla", "bot");
+      setToastMessage("⚠️ Por favor selecciona una talla");
       return;
     }
 
@@ -653,11 +664,10 @@ export default function ChatBot( ) {
       }
 
       // El mensaje de confirmación debe usar la cantidad y precio del item agregado/consolidado
-      addMessage(
+      setToastMessage(
         `✅ Agregado: ${newItem.DESCRIPCION} (${newItem.TALLA}) x${newItem.CANTIDAD} = $${(
           newItem.PRECIO_APLICADO * newItem.CANTIDAD
-        ).toFixed(2)}`,
-        "bot"
+        ).toFixed(2)}`
       );
 
       return {
@@ -668,7 +678,7 @@ export default function ChatBot( ) {
     });
 
     // Los botones de acción se manejarán con la barra flotante
-    addMessage("¿Qué deseas hacer?", "bot"); // Mensaje simple para indicar que se esperan acciones
+    // addMessage("¿Qué deseas hacer?", "bot"); // Mensaje simple para indicar que se esperan acciones (ya no es necesario)
 
     setSelectedTalla("");
     setCantidad(1);
@@ -1262,7 +1272,7 @@ export default function ChatBot( ) {
         municipio: "TIENDA",
         punto_referencia: "RETIRO EN TIENDA",
         encomiendista: "RETIRO EN TIENDA",
-        encomiendista_nombre: "RETIRO EN TIENDA",
+        encomiendista_nombre: "Retiro en Tienda",
         dia_entrega: "INMEDIATO",
         hora_entrega: "HORARIO DE TIENDA",
         step: "metodo_pago",
@@ -1546,6 +1556,16 @@ export default function ChatBot( ) {
             </div>
           </div>
         ))}
+
+        {/* COMPONENTE TOAST (Notificación Temporal) */}
+        {toastMessage && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+            <div className={`bg-white text-gray-800 rounded-xl shadow-2xl p-3 flex items-center gap-2 border ${toastMessage.includes("⚠️") ? "border-yellow-500" : "border-green-500"}`}>
+              <span className="text-lg">{toastMessage.includes("⚠️") ? "⚠️" : "✅"}</span>
+              <span className="font-medium">{toastMessage.replace(/⚠️|✅/g, "").trim()}</span>
+            </div>
+          </div>
+        )}
 
         {loadingEncomiendas && (
           <div className="flex justify-center items-center">
