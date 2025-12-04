@@ -295,7 +295,7 @@ const DEPARTAMENTOS_MUNICIPIOS = {
     "Ereguayquín",
     "Estanzuelas",
     "Jiquilisco",
-    "Jucuarán",
+    "Jucuapa",
     "Jucuarán",
     "Mercedes Umaña",
     "Nueva Granada",
@@ -349,6 +349,7 @@ export default function ChatBot( ) {
   const [showCarousel, setShowCarousel] = useState(false);
   const [showEncomiendaCarousel, setShowEncomiendaCarousel] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("todos");
+  const [categoriasDinamicas, setCategoriasDinamicas] = useState([]);
   const [selectedTalla, setSelectedTalla] = useState("");
   const [cantidad, setCantidad] = useState(1);
 
@@ -393,7 +394,14 @@ export default function ChatBot( ) {
         addMessage("❌ Error al cargar el catálogo. Intenta de nuevo.", "bot");
         setCatalogo([]);
       } else {
-        setCatalogo(data.items || []);
+        const items = data.items || [];
+        setCatalogo(items);
+
+        // Extraer categorías únicas y dinámicas
+        if (items.length > 0) {
+          const categorias = [...new Set(items.map(item => item.CATEGORIA).filter(Boolean))];
+          setCategoriasDinamicas(categorias);
+        }
         if (data.items && data.items.length > 0) {
           addMessage(
             `✨ Encontré ${data.items.length} productos disponibles. Usa las flechas para navegar:`,
@@ -508,23 +516,6 @@ export default function ChatBot( ) {
         .toLowerCase()
         .includes(selectedCategory.toLowerCase())
     );
-  };
-
-  // ===================================
-  //      CARRUSEL DE PRODUCTOS
-  // ===================================
-  const handleCarouselNav = (direction) => {
-    const filtered = getFilteredCatalog();
-    if (!filtered.length) return;
-
-    if (direction === "next") {
-      setCarouselIndex((prev) => (prev + 1) % filtered.length);
-    } else {
-      setCarouselIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
-    }
-
-    setSelectedTalla("");
-    setCantidad(1);
   };
 
   // ===================================
@@ -836,20 +827,24 @@ export default function ChatBot( ) {
     if (tipoEnvioTexto === "PERSONALIZADO") tipoEnvioTexto = "🏠 PERSONALIZADO";
     if (tipoEnvioTexto === "PUNTO FIJO") tipoEnvioTexto = "📍 PUNTO FIJO";
     if (tipoEnvioTexto === "CASILLERO") tipoEnvioTexto = "📦 CASILLERO";
+    if (tipoEnvioTexto === "RETIRO EN TIENDA") tipoEnvioTexto = "🏪 RETIRO EN TIENDA";
 
-    resumen += `💵 costo_envio: $${sessionData.costo_envio.toFixed(2)}\n`;
+    resumen += `💵 costo_envio: $${sessionData.costo_envio.toFixed(2)}\n\n`;
 
     // DETALLES DEL ENVÍO (Nuevo orden solicitado)
     resumen += `*DETALLES DEL ENVÍO:*\n\n`;
     resumen += `🚚 envío: ${tipoEnvioTexto}\n`;
-    resumen += `📍 departamento: ${sessionData.departamento}\n`;
-    let ubicacionAgrupada = sessionData.municipio;
-    if (sessionData.punto_referencia) {
-      ubicacionAgrupada += ` - ${sessionData.punto_referencia}`;
+    
+    if (sessionData.tipo_entrega !== "RETIRO EN TIENDA") {
+      resumen += `📍 departamento: ${sessionData.departamento}\n`;
+      let ubicacionAgrupada = sessionData.municipio;
+      if (sessionData.punto_referencia) {
+        ubicacionAgrupada += ` - ${sessionData.punto_referencia}`;
+      }
+      resumen += `📍 ${ubicacionAgrupada}\n`;
     }
-    resumen += `📍 ${ubicacionAgrupada}\n`;
 
-    if (sessionData.encomiendista_nombre && sessionData.tipo_entrega !== "PERSONALIZADO") {
+    if (sessionData.encomiendista_nombre && sessionData.tipo_entrega !== "PERSONALIZADO" && sessionData.tipo_entrega !== "RETIRO EN TIENDA") {
       resumen += `🚛 encomendista: ${sessionData.encomiendista_nombre}\n`;
     }
 
@@ -1050,6 +1045,7 @@ export default function ChatBot( ) {
     if (tipoTexto === "PERSONALIZADO") tipoTexto = "🏠 PERSONALIZADO";
     if (tipoTexto === "PUNTO FIJO") tipoTexto = "📍 PUNTO FIJO";
     if (tipoTexto === "CASILLERO") tipoTexto = "📦 CASILLERO";
+    if (tipoTexto === "RETIRO EN TIENDA") tipoTexto = "🏪 RETIRO EN TIENDA";
 
     // DETALLES DEL ENVÍO (Nuevo orden solicitado)
     mensaje += `*DETALLES DEL ENVÍO:*\n`;
@@ -1061,7 +1057,7 @@ export default function ChatBot( ) {
       mensaje += `📌 punto_referencia: ${sessionData.punto_referencia}\n`;
     }
 
-    if (sessionData.encomiendista_nombre && sessionData.tipo_entrega !== "PERSONALIZADO") {
+    if (sessionData.encomiendista_nombre && sessionData.tipo_entrega !== "PERSONALIZADO" && sessionData.tipo_entrega !== "RETIRO EN TIENDA") {
       mensaje += `🚛 encomendista: ${sessionData.encomiendista_nombre}\n`;
     }
 
@@ -1189,6 +1185,7 @@ export default function ChatBot( ) {
           [
             { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
             { label: "📦 CASILLERO", value: "tipo_casillero" },
+            { label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" },
           ]
         );
       } else {
@@ -1197,6 +1194,7 @@ export default function ChatBot( ) {
           { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
           { label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" },
           { label: "📦 CASILLERO", value: "tipo_casillero" },
+          { label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" },
         ]);
       }
       return;
@@ -1246,6 +1244,31 @@ export default function ChatBot( ) {
           { label: "📞 Contactar agente", value: "agente" },
         ]);
       }
+      return;
+    }
+
+    if (input === "tipo_retiro_tienda") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "RETIRO EN TIENDA",
+        costo_envio: 0,
+        departamento: "TIENDA",
+        municipio: "TIENDA",
+        punto_referencia: "RETIRO EN TIENDA",
+        encomiendista: "RETIRO EN TIENDA",
+        encomiendista_nombre: "RETIRO EN TIENDA",
+        dia_entrega: "INMEDIATO",
+        hora_entrega: "HORARIO DE TIENDA",
+        step: "metodo_pago",
+      }));
+      addMessage(
+        "✅ Has seleccionado *RETIRO EN TIENDA*.\n\n¿Cómo deseas pagar?",
+        "bot",
+        [
+          { label: "💵 Contra entrega", value: "contra_entrega" },
+          { label: "💳 Transferencia", value: "transferencia" },
+        ]
+      );
       return;
     }
 
@@ -1529,9 +1552,9 @@ export default function ChatBot( ) {
                 className="px-3 py-1 border rounded-lg text-sm"
               >
                 <option value="todos">Todos</option>
-                <option value="pantalones">Pantalones</option>
-                <option value="blusas">Blusas</option>
-                <option value="zapatos">Zapatos</option>
+                {categoriasDinamicas.map((cat, i) => (
+                  <option key={i} value={cat.toLowerCase()}>{cat}</option>
+                ))}
               </select>
             </div>
 
@@ -1605,9 +1628,10 @@ export default function ChatBot( ) {
                       type="number"
                       min="1"
                       value={cantidad}
-                      onChange={(e) =>
-                        setCantidad(parseInt(e.target.value) || 1)
-                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCantidad(val === "" ? "" : parseInt(val) || 1);
+                      }}
                       className="w-full px-3 py-2 border rounded-lg"
                     />
                   </div>
