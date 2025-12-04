@@ -308,7 +308,7 @@ const DEPARTAMENTOS_MUNICIPIOS = {
     "Santa Elena",
     "Santa María",
     "Santiago de María",
-    "Tecapán",
+    "Tecoluca",
   ],
 };
 
@@ -410,7 +410,11 @@ export default function ChatBot( ) {
 
         // Extraer categorías únicas y dinámicas
         if (items.length > 0) {
-          const categorias = [...new Set(items.map(item => item.CATEGORIA).filter(Boolean))];
+          const categorias = [
+            ...new Set(
+              items.map((item) => item.CATEGORIA).filter(Boolean)
+            ),
+          ];
           setCategoriasDinamicas(categorias);
         }
         if (data.items && data.items.length > 0) {
@@ -499,11 +503,21 @@ export default function ChatBot( ) {
 
     // --- INCENTIVO TRANSFERENCIA (3) ---
     const costoEnvio = enc.COSTO_ENVIO;
-    const totalContraEntrega = calcularTotalCarrito("Contra entrega", sessionData.carrito, costoEnvio);
-    const totalTransferencia = calcularTotalCarrito("Transferencia", sessionData.carrito, costoEnvio);
+    const totalContraEntrega = calcularTotalCarrito(
+      "Contra entrega",
+      sessionData.carrito,
+      costoEnvio
+    );
+    const totalTransferencia = calcularTotalCarrito(
+      "Transferencia",
+      sessionData.carrito,
+      costoEnvio
+    );
     let incentivoTexto = "";
     if (totalTransferencia < totalContraEntrega) {
-      incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(2)}. ¡Aprovecha el mejor precio!`;
+      incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(
+        2
+      )}. ¡Aprovecha el mejor precio!`;
     }
     // -----------------------------------
 
@@ -533,7 +547,8 @@ export default function ChatBot( ) {
   //   PRECIO BÁSICO (CATÁLOGO PREVIEW)
   // ===================================
   const calcularPrecioPreview = (producto, cant) => {
-    if (cant >= 30) return producto.PRECIO_CAJA_MAYOR30 || producto.PRECIO_UNIDAD;
+    if (cant >= 30)
+      return producto.PRECIO_CAJA_MAYOR30 || producto.PRECIO_UNIDAD;
     if (cant >= 12) return producto.PRECIO_DOCENA || producto.PRECIO_UNIDAD;
     if (cant >= 6) return producto.PRECIO_MEDIADOCENA || producto.PRECIO_UNIDAD;
     if (cant >= 2) return producto.PRECIO_PAR || producto.PRECIO_UNIDAD;
@@ -646,7 +661,7 @@ export default function ChatBot( ) {
         newCarrito = [...prev.carrito];
         const existingItem = newCarrito[existingIndex];
         newCantidad = existingItem.CANTIDAD + newItem.CANTIDAD;
-        
+
         // Recalcular precio basado en la nueva cantidad total
         newPricePre = calcularPrecioPreview(currentProduct, newCantidad);
 
@@ -761,14 +776,18 @@ export default function ChatBot( ) {
       if (targetQty > 0 && targetPrice < group.precio) {
         let mostrar = false;
         if (targetQty === 2 && remaining === 1) mostrar = true;
-        if (targetQty === 6 && (remaining === 1 || remaining === 2)) mostrar = true;
-        if (targetQty === 12 && (remaining === 1 || remaining === 2)) mostrar = true;
+        if (targetQty === 6 && (remaining === 1 || remaining === 2))
+          mostrar = true;
+        if (targetQty === 12 && (remaining === 1 || remaining === 2))
+          mostrar = true;
         if (targetQty === 30 && remaining <= 10) mostrar = true;
 
         if (mostrar) {
           texto += `💡 *¡Aprovecha en ${group.categoria}!*`;
           texto += `\nSolo ${remaining} piezas más para llegar a ${targetName}.`;
-          texto += `\n¡El precio bajará automáticamente a $${targetPrice.toFixed(2)} c/u! 🔥\n\n`;
+          texto += `\n¡El precio bajará automáticamente a $${targetPrice.toFixed(
+            2
+          )} c/u! 🔥\n\n`;
         }
       }
     });
@@ -839,7 +858,7 @@ export default function ChatBot( ) {
 
     // DETALLES DEL ENVÍO (Nuevo orden solicitado)
     resumen += `*DETALLES DEL ENVÍO:*\n\n`;
-    
+
     let tipoEnvioTexto = sessionData.tipo_entrega;
     if (tipoEnvioTexto === "PERSONALIZADO") tipoEnvioTexto = "🏠 PERSONALIZADO";
     if (tipoEnvioTexto === "PUNTO FIJO") tipoEnvioTexto = "📍 PUNTO FIJO";
@@ -847,10 +866,10 @@ export default function ChatBot( ) {
     if (tipoEnvioTexto === "RETIRO EN TIENDA") tipoEnvioTexto = "🏪 RETIRO EN TIENDA";
 
     resumen += `🚚 envío: ${tipoEnvioTexto}\n`;
-    
+
     if (sessionData.tipo_entrega !== "RETIRO EN TIENDA") {
       resumen += `📍 departamento: ${sessionData.departamento}\n`;
-      
+
       let ubicacionAgrupada = sessionData.municipio;
       if (sessionData.punto_referencia) {
         ubicacionAgrupada += ` - ${sessionData.punto_referencia}`;
@@ -858,7 +877,11 @@ export default function ChatBot( ) {
       resumen += `📍 ${ubicacionAgrupada}\n`;
     }
 
-    if (sessionData.encomiendista_nombre && sessionData.tipo_entrega !== "PERSONALIZADO" && sessionData.tipo_entrega !== "RETIRO EN TIENDA") {
+    if (
+      sessionData.encomiendista_nombre &&
+      sessionData.tipo_entrega !== "PERSONALIZADO" &&
+      sessionData.tipo_entrega !== "RETIRO EN TIENDA"
+    ) {
       resumen += `🚛 encomendista: ${sessionData.encomiendista_nombre}\n`;
     }
 
@@ -1069,7 +1092,11 @@ export default function ChatBot( ) {
       mensaje += `📌 punto_referencia: ${sessionData.punto_referencia}\n`;
     }
 
-    if (sessionData.encomiendista_nombre && sessionData.tipo_entrega !== "PERSONALIZADO" && sessionData.tipo_entrega !== "RETIRO EN TIENDA") {
+    if (
+      sessionData.encomiendista_nombre &&
+      sessionData.tipo_entrega !== "PERSONALIZADO" &&
+      sessionData.tipo_entrega !== "RETIRO EN TIENDA"
+    ) {
       mensaje += `🚛 encomendista: ${sessionData.encomiendista_nombre}\n`;
     }
 
@@ -1089,8 +1116,8 @@ export default function ChatBot( ) {
      )}`;
 
     addMessage("Abriendo WhatsApp para confirmar tu pedido... 📱", "bot");
-    // Abrir inmediatamente para máxima compatibilidad con iOS/móviles
-    window.open(url, "_blank");
+    // Usar window.location.href para máxima compatibilidad en iOS/móviles
+    window.location.href = url;
   };
 
   // ===================================
@@ -1160,7 +1187,7 @@ export default function ChatBot( ) {
         msg
        )}`;
       addMessage("Conectándote con un asesor... 👋", "bot");
-      setTimeout(() => window.open(url, "_blank"), 1000);
+      window.location.href = url;
       return;
     }
 
@@ -1376,11 +1403,21 @@ export default function ChatBot( ) {
 
       // --- INCENTIVO TRANSFERENCIA (3) ---
       const costoEnvio = 3.5; // Costo fijo para envío personalizado
-      const totalContraEntrega = calcularTotalCarrito("Contra entrega", session.carrito, costoEnvio);
-      const totalTransferencia = calcularTotalCarrito("Transferencia", session.carrito, costoEnvio);
+      const totalContraEntrega = calcularTotalCarrito(
+        "Contra entrega",
+        session.carrito,
+        costoEnvio
+      );
+      const totalTransferencia = calcularTotalCarrito(
+        "Transferencia",
+        session.carrito,
+        costoEnvio
+      );
       let incentivoTexto = "";
       if (totalTransferencia < totalContraEntrega) {
-        incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(2)}. ¡Aprovecha el mejor precio!`;
+        incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(
+          2
+        )}. ¡Aprovecha el mejor precio!`;
       }
       // -----------------------------------
 
@@ -1560,9 +1597,19 @@ export default function ChatBot( ) {
         {/* COMPONENTE TOAST (Notificación Temporal) */}
         {toastMessage && (
           <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
-            <div className={`bg-white text-gray-800 rounded-xl shadow-2xl p-3 flex items-center gap-2 border ${toastMessage.includes("⚠️") ? "border-yellow-500" : "border-green-500"}`}>
-              <span className="text-lg">{toastMessage.includes("⚠️") ? "⚠️" : "✅"}</span>
-              <span className="font-medium">{toastMessage.replace(/⚠️|✅/g, "").trim()}</span>
+            <div
+              className={`bg-white text-gray-800 rounded-xl shadow-2xl p-3 flex items-center gap-2 border ${
+                toastMessage.includes("⚠️")
+                  ? "border-yellow-500"
+                  : "border-green-500"
+              }`}
+            >
+              <span className="text-lg">
+                {toastMessage.includes("⚠️") ? "⚠️" : "✅"}
+              </span>
+              <span className="font-medium">
+                {toastMessage.replace(/⚠️|✅/g, "").trim()}
+              </span>
             </div>
           </div>
         )}
@@ -1591,7 +1638,9 @@ export default function ChatBot( ) {
               >
                 <option value="todos">Todos</option>
                 {categoriasDinamicas.map((cat, i) => (
-                  <option key={i} value={cat.toLowerCase()}>{cat}</option>
+                  <option key={i} value={cat.toLowerCase()}>
+                    {cat}
+                  </option>
                 ))}
               </select>
             </div>
