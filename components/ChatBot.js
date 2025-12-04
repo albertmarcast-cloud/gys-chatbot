@@ -818,60 +818,53 @@ export default function ChatBot( ) {
     const total = subtotal + sessionData.costo_envio;
 
     let resumen = `📋 *RESUMEN DE TU PEDIDO*\n\n`;
-    resumen += `👤 ${sessionData.nombre}\n`;
-    resumen += `📱 ${sessionData.telefono}\n\n`;
+    resumen += `👤 ${sessionData.nombre.toUpperCase()}\n`;
+    resumen += `📱 ${sessionData.telefono.toUpperCase()}\n\n`;
 
-    resumen += `📦 *Productos (${sessionData.carrito.length}):*\n`;
+    resumen += `📦 *Productos (${sessionData.carrito.length}):*\n\n`;
     sessionData.carrito.forEach((item, idx) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
-      // 2.A Formato detallado (mini-factura) para el resumen
-      resumen += `\nProducto #${idx + 1}\n\n`;
-      resumen += `Código interno: ${item.CODIGO_INTERNO}\n`;
-      resumen += `Categoría: ${item.CATEGORIA}\n`;
-      resumen += `Descripción: ${item.DESCRIPCION}\n`;
-      resumen += `Color: ${item.COLOR}\n`;
-      resumen += `Talla: ${item.TALLA}\n`;
-      resumen += `Cantidad: ${item.CANTIDAD}\n`;
-      resumen += `Precio: $${precio.toFixed(2)} c/u\n`;
-      resumen += `Subtotal: $${subItem.toFixed(2)}\n`;
+      // Formato corto para el resumen (tipo carrito)
+      resumen += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
+      resumen += `   Cantidad: ${item.CANTIDAD} → $${subItem.toFixed(2)}\n\n`;
     });
 
-    resumen += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
+    resumen += `\n💰 subtotal: $${subtotal.toFixed(2)}\n`;
 
     let tipoEnvioTexto = sessionData.tipo_entrega;
     if (tipoEnvioTexto === "PERSONALIZADO") tipoEnvioTexto = "🏠 PERSONALIZADO";
     if (tipoEnvioTexto === "PUNTO FIJO") tipoEnvioTexto = "📍 PUNTO FIJO";
     if (tipoEnvioTexto === "CASILLERO") tipoEnvioTexto = "📦 CASILLERO";
 
-    resumen += `\n💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
+    resumen += `💵 costo_envio: $${sessionData.costo_envio.toFixed(2)}\n`;
 
     // DETALLES DEL ENVÍO (Nuevo orden solicitado)
     resumen += `*DETALLES DEL ENVÍO:*\n`;
-    resumen += `🚚 ENVÍO: ${tipoEnvioTexto}\n`;
-    resumen += `📍 DEPARTAMENTO: ${sessionData.departamento}\n`;
-    resumen += `🗺️ MUNICIPIO: ${sessionData.municipio}\n`;
+    resumen += `🚚 envío: ${tipoEnvioTexto}\n`;
+    resumen += `📍 departamento: ${sessionData.departamento}\n`;
+    resumen += `🗺️ municipio: ${sessionData.municipio}\n`;
 
     if (sessionData.punto_referencia) {
-      resumen += `📌 PUNTO DE REFERENCIA: ${sessionData.punto_referencia}\n`;
+      resumen += `📌 punto_referencia: ${sessionData.punto_referencia}\n`;
     }
 
     if (sessionData.encomiendista_nombre && sessionData.tipo_entrega !== "PERSONALIZADO") {
-      resumen += `🚛 ENCOMIENDISTA: ${sessionData.encomiendista_nombre}\n`;
+      resumen += `🚛 encomendista: ${sessionData.encomiendista_nombre}\n`;
     }
 
     if (sessionData.dia_entrega) {
-      resumen += `📅 DÍA DE ENTREGA: ${sessionData.dia_entrega}\n`;
+      resumen += `📅 dia_entrega: ${sessionData.dia_entrega}\n`;
     }
 
     if (sessionData.hora_entrega) {
-      resumen += `⏰ HORA DE ENTREGA: ${sessionData.hora_entrega}\n`;
+      resumen += `⏰ hora_entrega: ${sessionData.hora_entrega}\n`;
     }
 
-    resumen += `💵 COSTO DE ENVÍO: $${sessionData.costo_envio.toFixed(2)}\n`;
+    resumen += `💳 método_pago: ${sessionData.metodo_pago}\n\n`;
 
     // Método de pago ordenado y claro (siempre al final)
-    resumen += `\n💳 MÉTODO DE PAGO: ${sessionData.metodo_pago}\n\n`;
+    resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
     resumen += `¿Todo correcto?`;
 
     addMessage(resumen, "bot", [
@@ -1027,21 +1020,27 @@ export default function ChatBot( ) {
     const metodo = sessionData.metodo_pago || "Contra entrega";
 
     let mensaje = `🛍️ *NUEVO PEDIDO - GyS Importadora*\n\n`;
-    mensaje += `👤 *Cliente:* ${sessionData.nombre}\n`;
-    mensaje += `📱 *Teléfono:* ${sessionData.telefono}\n\n`;
+    mensaje += `👤 *Cliente:* ${sessionData.nombre.toUpperCase()}\n`;
+    mensaje += `📱 *Teléfono:* ${sessionData.telefono.toUpperCase()}\n\n`;
 
-    mensaje += `📦 *PRODUCTOS:*\n`;
+    mensaje += `📦 *PRODUCTOS (${sessionData.carrito.length}):*\n`;
     sessionData.carrito.forEach((item, idx) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
-      mensaje += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
-      mensaje += `   Cant: ${item.CANTIDAD} x $${precio.toFixed(
-        2
-      )} = $${subItem.toFixed(2)}\n`;
+      // Formato detallado (mini-factura) para WhatsApp
+      mensaje += `\nProducto #${idx + 1}\n`;
+      mensaje += `Código interno: ${item.CODIGO_INTERNO}\n`;
+      mensaje += `Categoría: ${item.CATEGORIA}\n`;
+      mensaje += `Descripción: ${item.DESCRIPCION}\n`;
+      mensaje += `Color: ${item.COLOR}\n`;
+      mensaje += `Talla: ${item.TALLA}\n`;
+      mensaje += `Cantidad: ${item.CANTIDAD}\n`;
+      mensaje += `Precio: $${precio.toFixed(2)} c/u\n`;
+      mensaje += `Subtotal: $${subItem.toFixed(2)}\n`;
     });
 
-    mensaje += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
-    mensaje += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
+    mensaje += `\n💰 subtotal: $${subtotal.toFixed(2)}\n`;
+    mensaje += `💵 costo_envio: $${sessionData.costo_envio.toFixed(2)}\n`;
 
     let tipoTexto = sessionData.tipo_entrega;
     if (tipoTexto === "PERSONALIZADO") tipoTexto = "🏠 PERSONALIZADO";
@@ -1050,29 +1049,29 @@ export default function ChatBot( ) {
 
     // DETALLES DEL ENVÍO (Nuevo orden solicitado)
     mensaje += `*DETALLES DEL ENVÍO:*\n`;
-    mensaje += `🚚 ENVÍO: ${tipoTexto}\n`;
-    mensaje += `📍 DEPARTAMENTO: ${sessionData.departamento}\n`;
-    mensaje += `🗺️ MUNICIPIO: ${sessionData.municipio}\n`;
+    mensaje += `🚚 envío: ${tipoTexto}\n`;
+    mensaje += `📍 departamento: ${sessionData.departamento}\n`;
+    mensaje += `🗺️ municipio: ${sessionData.municipio}\n`;
 
     if (sessionData.punto_referencia) {
-      mensaje += `📌 PUNTO DE REFERENCIA: ${sessionData.punto_referencia}\n`;
+      mensaje += `📌 punto_referencia: ${sessionData.punto_referencia}\n`;
     }
 
     if (sessionData.encomiendista_nombre && sessionData.tipo_entrega !== "PERSONALIZADO") {
-      mensaje += `🚛 ENCOMIENDISTA: ${sessionData.encomiendista_nombre}\n`;
+      mensaje += `🚛 encomendista: ${sessionData.encomiendista_nombre}\n`;
     }
 
     if (sessionData.dia_entrega) {
-      mensaje += `📅 DÍA DE ENTREGA: ${sessionData.dia_entrega}\n`;
+      mensaje += `📅 dia_entrega: ${sessionData.dia_entrega}\n`;
     }
 
     if (sessionData.hora_entrega) {
-      mensaje += `⏰ HORA DE ENTREGA: ${sessionData.hora_entrega}\n`;
+      mensaje += `⏰ hora_entrega: ${sessionData.hora_entrega}\n`;
     }
 
-    mensaje += `💵 COSTO DE ENVÍO: $${sessionData.costo_envio.toFixed(2)}\n`;
+    mensaje += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
 
-    mensaje += `\n💳 MÉTODO DE PAGO: ${sessionData.metodo_pago}\n\n`;
+    mensaje += `💳 método_pago: ${sessionData.metodo_pago}\n\n`;
     mensaje += `✨ _Pedido desde chatbot automático_`;
 
     const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
