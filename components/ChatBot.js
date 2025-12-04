@@ -668,19 +668,13 @@ export default function ChatBot( ) {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
 
-      // 1.A Formato profesional por producto
-      texto += `${idx + 1}. ${item.DESCRIPCION}\n`;
-      texto += `Código interno: ${item.CODIGO_INTERNO}\n`;
-      texto += `Categoría: ${item.CATEGORIA}\n`;
-      texto += `Color: ${item.COLOR}\n`;
-      texto += `Talla: ${item.TALLA}\n`;
-      texto += `Cantidad: ${item.CANTIDAD}\n`;
-      texto += `Precio: $${precio.toFixed(2)} c/u\n`;
-      texto += `Subtotal: $${subItem.toFixed(2)}\n\n`;
+      // 1.A Formato corto y claro por producto
+      texto += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
+      texto += `   Cantidad: ${item.CANTIDAD} → $${subItem.toFixed(2)}\n\n`;
 
       subtotal += subItem;
 
-      // 1.B Incentivo de cantidad (Agrupar por categoría + precio)
+      // 1.B Incentivo de cantidad (Agrupar por categoría + precio) - Lógica para incentivos
       const key = `${item.CATEGORIA}_${precio.toFixed(2)}`;
       if (!incentivos[key]) {
         incentivos[key] = {
@@ -693,52 +687,55 @@ export default function ChatBot( ) {
       incentivos[key].cantidad += item.CANTIDAD;
     });
 
-    texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
-
-    // Lógica de incentivos (1.B)
+    // Lógica de incentivos (1.B) - Se muestran antes del subtotal final, agrupados por producto.
     Object.values(incentivos).forEach((group) => {
       const currentQty = group.cantidad;
       const item = group.item;
       let targetQty = 0;
       let targetPrice = 0;
       let targetName = "";
+      let remaining = 0;
 
       // Buscar el siguiente nivel de descuento
-      if (currentQty < 2) {
+      if (currentQty === 1) {
         targetQty = 2;
         targetPrice = calcularPrecioItemConCantidad(item, metodo, 2);
         targetName = "par";
-      } else if (currentQty < 6) {
+        remaining = 1;
+      } else if (currentQty >= 4 && currentQty <= 5) {
         targetQty = 6;
         targetPrice = calcularPrecioItemConCantidad(item, metodo, 6);
         targetName = "media docena";
-      } else if (currentQty < 12) {
+        remaining = 6 - currentQty;
+      } else if (currentQty >= 10 && currentQty <= 11) {
         targetQty = 12;
         targetPrice = calcularPrecioItemConCantidad(item, metodo, 12);
         targetName = "docena";
-      } else if (currentQty < 30) {
+        remaining = 12 - currentQty;
+      } else if (currentQty >= 20 && currentQty <= 29) {
         targetQty = 30;
         targetPrice = calcularPrecioItemConCantidad(item, metodo, 30);
         targetName = "caja";
+        remaining = 30 - currentQty;
       }
 
-      const remaining = targetQty - currentQty;
-
-      // Mostrar incentivo solo si el precio baja y faltan 1, 2 o 3 (o <=10 para caja)
+      // Mostrar incentivo solo si el precio baja y cumple la condición de "faltan"
       if (targetQty > 0 && targetPrice < group.precio) {
-        if (targetQty === 30) {
-          if (remaining <= 10) {
-            texto += `\n\n💡 *¡Aprovecha!*`;
-            texto += `\nSolo ${remaining} piezas más para llegar a ${targetName}.`;
-            texto += `\n¡El precio bajará automáticamente a $${targetPrice.toFixed(2)} c/u! 🔥`;
-          }
-        } else if (remaining >= 1 && remaining <= 3) {
-          texto += `\n\n💡 *¡Aprovecha!*`;
+        let mostrar = false;
+        if (targetQty === 2 && remaining === 1) mostrar = true;
+        if (targetQty === 6 && (remaining === 1 || remaining === 2)) mostrar = true;
+        if (targetQty === 12 && (remaining === 1 || remaining === 2)) mostrar = true;
+        if (targetQty === 30 && remaining <= 10) mostrar = true;
+
+        if (mostrar) {
+          texto += `💡 *¡Aprovecha!*`;
           texto += `\nSolo ${remaining} piezas más para llegar a ${targetName}.`;
-          texto += `\n¡El precio bajará automáticamente a $${targetPrice.toFixed(2)} c/u! 🔥`;
+          texto += `\n¡El precio bajará automáticamente a $${targetPrice.toFixed(2)} c/u! 🔥\n\n`;
         }
       }
     });
+
+    texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
 
     addMessage(texto, "bot");
   };
@@ -793,9 +790,16 @@ export default function ChatBot( ) {
     sessionData.carrito.forEach((item, idx) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
-      // 2.A Formato sencillo y claro para el resumen
-      resumen += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
-      resumen += `   Cantidad: ${item.CANTIDAD} → $${subItem.toFixed(2)}\n`;
+      // 2.A Formato detallado (mini-factura) para el resumen
+      resumen += `\nProducto #${idx + 1}\n\n`;
+      resumen += `Código interno: ${item.CODIGO_INTERNO}\n`;
+      resumen += `Categoría: ${item.CATEGORIA}\n`;
+      resumen += `Descripción: ${item.DESCRIPCION}\n`;
+      resumen += `Color: ${item.COLOR}\n`;
+      resumen += `Talla: ${item.TALLA}\n`;
+      resumen += `Cantidad: ${item.CANTIDAD}\n`;
+      resumen += `Precio: $${precio.toFixed(2)} c/u\n`;
+      resumen += `Subtotal: $${subItem.toFixed(2)}\n`;
     });
 
     resumen += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
