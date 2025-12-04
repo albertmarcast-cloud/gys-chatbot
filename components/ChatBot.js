@@ -295,7 +295,7 @@ const DEPARTAMENTOS_MUNICIPIOS = {
     "Ereguayquín",
     "Estanzuelas",
     "Jiquilisco",
-    "Jucuapa",
+    "Jucuarán",
     "Jucuarán",
     "Mercedes Umaña",
     "Nueva Granada",
@@ -315,7 +315,7 @@ const DEPARTAMENTOS_MUNICIPIOS = {
 // ======================
 //  COMPONENTE PRINCIPAL
 // ======================
-export default function ChatBot() {
+export default function ChatBot( ) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [catalogo, setCatalogo] = useState([]);
@@ -478,8 +478,18 @@ export default function ChatBot() {
     const tipoTexto =
       sessionData.tipo_entrega === "PUNTO FIJO" ? "punto fijo" : "casillero";
 
+    // --- INCENTIVO TRANSFERENCIA (3) ---
+    const costoEnvio = enc.COSTO_ENVIO;
+    const totalContraEntrega = calcularTotalCarrito("Contra entrega", sessionData.carrito, costoEnvio);
+    const totalTransferencia = calcularTotalCarrito("Transferencia", sessionData.carrito, costoEnvio);
+    let incentivoTexto = "";
+    if (totalTransferencia < totalContraEntrega) {
+      incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(2)}. ¡Aprovecha el mejor precio!`;
+    }
+    // -----------------------------------
+
     addMessage(
-      `✅ Seleccionaste ${tipoTexto}: ${enc.ENCOMIENDISTA}\n📍 ${enc.DEPARTAMENTO} - ${enc.MUNICIPIO}\n🏪 ${enc.PUNTO_REFERENCIA}\n💵 Costo: $${enc.COSTO_ENVIO}\n\n¿Cómo deseas pagar?`,
+      `✅ Seleccionaste ${tipoTexto}: ${enc.ENCOMIENDISTA}\n📍 ${enc.DEPARTAMENTO} - ${enc.MUNICIPIO}\n🏪 ${enc.PUNTO_REFERENCIA}\n💵 Costo: $${enc.COSTO_ENVIO}\n\n¿Cómo deseas pagar?${incentivoTexto}`,
       "bot",
       [
         { label: "💵 Contra entrega", value: "contra_entrega" },
@@ -561,7 +571,87 @@ export default function ChatBot() {
   };
 
   // ===================================
+  //     CALCULAR TOTAL DEL CARRITO
+  // ===================================
+  const calcularTotalCarrito = (metodoPago, carrito, costoEnvio) => {
+    const subtotal = carrito.reduce((sum, item) => {
+      const precio = calcularPrecioItem(item, metodoPago);
+      return sum + precio * item.CANTIDAD;
+    }, 0);
+    return subtotal + costoEnvio;
+  };
+
+  // ===================================
   //     AGREGAR PRODUCTO AL CARRITO
+  // ===================================
+  const agregarAlCarrito = () => {
+    const filtered = getFilteredCatalog();
+    const currentProduct = filtered[carouselIndex];
+    if (!currentProduct) return;
+
+    if (!selectedTalla && currentProduct.TALLAS_DISPONIBLES?.length > 0) {
+      addMessage("⚠️ Por favor selecciona una talla", "bot");
+      return;
+    }
+
+    // Precio preliminar solo para mostrar (se recalcula luego según método de pago)
+    const precioPre = calcularPrecioPreview(currentProduct, cantidad);
+
+    const item = {
+      CODIGO_INTERNO: currentProduct.CODIGO_INTERNO,
+      CODIGO: currentProduct.CODIGO,
+      CATEGORIA: currentProduct.CATEGORIA,
+      DESCRIPCION: currentProduct.DESCRIPCION,
+      TALLA: selectedTalla || currentProduct.TALLA_SIMPLE || "N/A",
+      COLOR: currentProduct.COLOR,
+      CANTIDAD: cantidad,
+
+      // Precios normales
+      PRECIO_UNIDAD: currentProduct.PRECIO_UNIDAD,
+      PRECIO_PAR: currentProduct.PRECIO_PAR,
+      PRECIO_MEDIADOCENA: currentProduct.PRECIO_MEDIADOCENA,
+      PRECIO_DOCENA: currentProduct.PRECIO_DOCENA,
+      PRECIO_CAJA_MAYOR30: currentProduct.PRECIO_CAJA_MAYOR30,
+
+      // Precios depósito (transferencia)
+      PRECIO_UNIDAD_DEPOSITO: currentProduct.PRECIO_UNIDAD_DEPOSITO,
+      PRECIO_PAR_DEPOSITO: currentProduct.PRECIO_PAR_DEPOSITO,
+      PRECIO_MEDIADOCENA_DEPOSITO: currentProduct.PRECIO_MEDIADOCENA_DEPOSITO,
+      PRECIO_DOCENA_DEPOSITO: currentProduct.PRECIO_DOCENA_DEPOSITO,
+      PRECIO_CAJA_MAYOR30_DEPOSITO: currentProduct.PRECIO_CAJA_MAYOR30_DEPOSITO,
+
+      // Pre-cálculo (se volverá a calcular según método de pago real)
+      PRECIO_UNITARIO: currentProduct.PRECIO_UNIDAD,
+      PRECIO_APLICADO: precioPre,
+      DESCUENTO_POR_CANTIDAD: 0,
+      SUBTOTAL_ITEM: precioPre * cantidad,
+      FOTO: currentProduct.FOTO || "",
+    };
+
+    setSessionData((prev) => ({
+      ...prev,
+      carrito: [...prev.carrito, item],
+    }));
+
+    addMessage(
+      `✅ Agregado: ${item.DESCRIPCION} (${item.TALLA}) x${cantidad} = $${(
+        precioPre * cantidad
+      ).toFixed(2)}`,
+      "bot"
+    );
+
+    addMessage("¿Qué deseas hacer?", "bot", [
+      { label: "➕ Agregar más productos", value: "agregar_mas" },
+      { label: "🛒 Ver mi carrito", value: "ver_carrito" },
+      { label: "✅ Continuar con el pedido", value: "continuar_pedido" },
+    ]);
+
+    setSelectedTalla("");
+    setCantidad(1);
+  };
+
+  // ===================================
+  //            MOSTRAR CARRITO
   // ===================================
   const mostrarCarrito = () => {
     if (sessionData.carrito.length === 0) {
@@ -572,23 +662,114 @@ export default function ChatBot() {
     let texto = "🛒 *TU CARRITO:*\n\n";
     let subtotal = 0;
     const metodo = sessionData.metodo_pago || "Contra entrega";
+    const incentivos = {}; // Para el punto 2.B
 
     sessionData.carrito.forEach((item, idx) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
 
+      // 1.A Formato profesional por producto
       texto += `${idx + 1}. ${item.DESCRIPCION}\n`;
-      texto += `   Talla: ${item.TALLA} | Cant: ${
-        item.CANTIDAD
-      }\n   $${precio.toFixed(2)} x ${
-        item.CANTIDAD
-      } = $${subItem.toFixed(2)}\n\n`;
+      texto += `Código interno: ${item.CODIGO_INTERNO}\n`;
+      texto += `Categoría: ${item.CATEGORIA}\n`;
+      texto += `Color: ${item.COLOR}\n`;
+      texto += `Talla: ${item.TALLA}\n`;
+      texto += `Cantidad: ${item.CANTIDAD}\n`;
+      texto += `Precio: $${precio.toFixed(2)} c/u\n`;
+      texto += `Subtotal: $${subItem.toFixed(2)}\n\n`;
 
       subtotal += subItem;
+
+      // 1.B Incentivo de cantidad (Agrupar por categoría + precio)
+      const key = `${item.CATEGORIA}_${precio.toFixed(2)}`;
+      if (!incentivos[key]) {
+        incentivos[key] = {
+          categoria: item.CATEGORIA,
+          precio: precio,
+          cantidad: 0,
+          item: item,
+        };
+      }
+      incentivos[key].cantidad += item.CANTIDAD;
     });
 
     texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
+
+    // Lógica de incentivos (1.B)
+    Object.values(incentivos).forEach((group) => {
+      const currentQty = group.cantidad;
+      const item = group.item;
+      let targetQty = 0;
+      let targetPrice = 0;
+      let targetName = "";
+
+      // Buscar el siguiente nivel de descuento
+      if (currentQty < 2) {
+        targetQty = 2;
+        targetPrice = calcularPrecioItemConCantidad(item, metodo, 2);
+        targetName = "par";
+      } else if (currentQty < 6) {
+        targetQty = 6;
+        targetPrice = calcularPrecioItemConCantidad(item, metodo, 6);
+        targetName = "media docena";
+      } else if (currentQty < 12) {
+        targetQty = 12;
+        targetPrice = calcularPrecioItemConCantidad(item, metodo, 12);
+        targetName = "docena";
+      } else if (currentQty < 30) {
+        targetQty = 30;
+        targetPrice = calcularPrecioItemConCantidad(item, metodo, 30);
+        targetName = "caja";
+      }
+
+      const remaining = targetQty - currentQty;
+
+      // Mostrar incentivo solo si el precio baja y faltan 1, 2 o 3 (o <=10 para caja)
+      if (targetQty > 0 && targetPrice < group.precio) {
+        if (targetQty === 30) {
+          if (remaining <= 10) {
+            texto += `\n\n💡 *¡Aprovecha!*`;
+            texto += `\nSolo ${remaining} piezas más para llegar a ${targetName}.`;
+            texto += `\n¡El precio bajará automáticamente a $${targetPrice.toFixed(2)} c/u! 🔥`;
+          }
+        } else if (remaining >= 1 && remaining <= 3) {
+          texto += `\n\n💡 *¡Aprovecha!*`;
+          texto += `\nSolo ${remaining} piezas más para llegar a ${targetName}.`;
+          texto += `\n¡El precio bajará automáticamente a $${targetPrice.toFixed(2)} c/u! 🔥`;
+        }
+      }
+    });
+
     addMessage(texto, "bot");
+  };
+
+  // Helper para calcular precio con una cantidad específica (necesario para el incentivo)
+  const calcularPrecioItemConCantidad = (item, metodoPago, cant) => {
+    const esTransferencia = metodoPago === "Transferencia";
+
+    const baseUnidad = Number(item.PRECIO_UNIDAD || 0);
+    const basePar = Number(item.PRECIO_PAR || baseUnidad);
+    const baseMedia = Number(item.PRECIO_MEDIADOCENA || baseUnidad);
+    const baseDocena = Number(item.PRECIO_DOCENA || baseUnidad);
+    const baseCaja = Number(item.PRECIO_CAJA_MAYOR30 || baseUnidad);
+
+    const depoUnidad = Number(item.PRECIO_UNIDAD_DEPOSITO || baseUnidad);
+    const depoPar = Number(item.PRECIO_PAR_DEPOSITO || depoUnidad);
+    const depoMedia = Number(item.PRECIO_MEDIADOCENA_DEPOSITO || depoUnidad);
+    const depoDocena = Number(item.PRECIO_DOCENA_DEPOSITO || depoUnidad);
+    const depoCaja = Number(item.PRECIO_CAJA_MAYOR30_DEPOSITO || depoUnidad);
+
+    const precioUnidad = esTransferencia ? depoUnidad : baseUnidad;
+    const precioPar = esTransferencia ? depoPar : basePar;
+    const precioMedia = esTransferencia ? depoMedia : baseMedia;
+    const precioDocena = esTransferencia ? depoDocena : baseDocena;
+    const precioCaja = esTransferencia ? depoCaja : baseCaja;
+
+    if (cant >= 30) return precioCaja || precioUnidad;
+    if (cant >= 12) return precioDocena || precioUnidad;
+    if (cant >= 6) return precioMedia || precioUnidad;
+    if (cant >= 2) return precioPar || precioUnidad;
+    return precioUnidad;
   };
 
   // ===================================
@@ -612,9 +793,9 @@ export default function ChatBot() {
     sessionData.carrito.forEach((item, idx) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
-      resumen += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA}) x${
-        item.CANTIDAD
-      } → $${subItem.toFixed(2)}\n`;
+      // 2.A Formato sencillo y claro para el resumen
+      resumen += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
+      resumen += `   Cantidad: ${item.CANTIDAD} → $${subItem.toFixed(2)}\n`;
     });
 
     resumen += `\n💰 Subtotal: $${subtotal.toFixed(2)}\n`;
@@ -629,6 +810,7 @@ export default function ChatBot() {
     )}\n`;
     resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
 
+    // 2.B Orden correcto de datos de envío
     resumen += `📍 ${sessionData.departamento} - ${sessionData.municipio}\n`;
 
     if (sessionData.tipo_entrega === "PERSONALIZADO") {
@@ -638,14 +820,15 @@ export default function ChatBot() {
         resumen += `🚛 ${sessionData.encomiendista_nombre}\n`;
       }
       if (sessionData.punto_referencia) {
-        resumen += `📍 ${sessionData.punto_referencia}\n`;
+        resumen += `📌 ${sessionData.punto_referencia}\n`; // Usar 📌 para punto de referencia
       }
       if (sessionData.dia_entrega) {
         resumen += `📅 ${sessionData.dia_entrega} | ⏰ ${sessionData.hora_entrega}\n`;
       }
     }
 
-    resumen += `💳 ${sessionData.metodo_pago}\n\n`;
+    // 2.C Método de pago ordenado y claro (siempre al final)
+    resumen += `\n💳 ${sessionData.metodo_pago}\n\n`;
     resumen += `¿Todo correcto?`;
 
     addMessage(resumen, "bot", [
@@ -850,7 +1033,7 @@ export default function ChatBot() {
 
     const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
       mensaje
-    )}`;
+     )}`;
 
     addMessage("Abriendo WhatsApp para confirmar tu pedido... 📱", "bot");
     setTimeout(() => {
@@ -922,7 +1105,7 @@ export default function ChatBot() {
       const msg = `Hola, soy ${session.nombre} y necesito ayuda con un pedido`;
       const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
         msg
-      )}`;
+       )}`;
       addMessage("Conectándote con un asesor... 👋", "bot");
       setTimeout(() => window.open(url, "_blank"), 1000);
       return;
@@ -1106,8 +1289,19 @@ export default function ChatBot() {
         encomiendista_nombre: "Envío Personalizado",
         step: "metodo_pago",
       }));
+
+      // --- INCENTIVO TRANSFERENCIA (3) ---
+      const costoEnvio = 3.5; // Costo fijo para envío personalizado
+      const totalContraEntrega = calcularTotalCarrito("Contra entrega", session.carrito, costoEnvio);
+      const totalTransferencia = calcularTotalCarrito("Transferencia", session.carrito, costoEnvio);
+      let incentivoTexto = "";
+      if (totalTransferencia < totalContraEntrega) {
+        incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(2)}. ¡Aprovecha el mejor precio!`;
+      }
+      // -----------------------------------
+
       addMessage(
-        "🏠 Punto de referencia registrado\n💵 Costo de envío: $3.50\n\n¿Cómo deseas pagar?",
+        `🏠 Punto de referencia registrado\n💵 Costo de envío: $3.50\n\n¿Cómo deseas pagar?${incentivoTexto}`,
         "bot",
         [
           { label: "💵 Contra entrega", value: "contra_entrega" },
@@ -1308,14 +1502,14 @@ export default function ChatBot() {
                       currentProduct.FOTO ||
                       currentProduct["FOTO LINK"] ||
                       "https://via.placeholder.com/300";
-                    if (url.includes("drive.google.com/uc?export=view")) {
+                    if (url.includes("drive.google.com/uc?export=view" )) {
                       const id = url.split("id=")[1];
                       if (id) {
                         url = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
                       }
                     }
                     return url;
-                  })()}
+                  } )()}
                   alt={currentProduct.DESCRIPCION}
                   className="w-full h-64 object-cover rounded-lg mb-3"
                   onError={(e) => {
@@ -1345,7 +1539,7 @@ export default function ChatBot() {
                         </label>
                         <select
                           value={selectedTalla}
-                          onChange={(e) => setSelectedTalla(e.target.value)}
+                          onChange={(e ) => setSelectedTalla(e.target.value)}
                           className="w-full px-3 py-2 border rounded-lg"
                         >
                           <option value="">Selecciona talla</option>
@@ -1435,12 +1629,12 @@ export default function ChatBot() {
                       src={fotoUrl}
                       alt={enc.ENCOMIENDISTA}
                       className="w-full h-48 object-cover rounded-lg mb-3"
-                      onError={(e) => {
+                      onError={(e ) => {
                         e.target.src =
                           "https://via.placeholder.com/300?text=Sin+Foto";
                       }}
                     />
-                  )}
+                   )}
 
                   <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
                     <h4 className="font-bold text-xl text-purple-600">
@@ -1557,4 +1751,3 @@ export default function ChatBot() {
     </div>
   );
 }
-
