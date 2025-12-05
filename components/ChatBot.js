@@ -436,12 +436,18 @@ export default function ChatBot( ) {
   // ===================================
   //   CARGAR ENCOMIENDISTAS DESDE SCRIPT
   // ===================================
-  const cargarEncomiendistas = async (tipoEnvio) => {
+  const cargarEncomiendistas = async (tipoEnvio, departamento = "", municipio = "") => {
     setLoadingEncomiendas(true);
     try {
-      const url = `${SCRIPT_URL}?route=encomiendas&tipo_entrega=${encodeURIComponent(
-        tipoEnvio
-      )}`;
+      // Construir URL con parámetros opcionales de departamento y municipio
+      let url = `${SCRIPT_URL}?route=encomiendas&tipo_entrega=${encodeURIComponent(tipoEnvio)}`;
+      if (departamento) {
+        url += `&departamento=${encodeURIComponent(departamento)}`;
+      }
+      if (municipio) {
+        url += `&municipio=${encodeURIComponent(municipio)}`;
+      }
+      
       const res = await fetch(url);
       const data = await res.json();
 
@@ -1277,20 +1283,13 @@ export default function ChatBot( ) {
       addMessage(`✅ Municipio: ${municipio}`, "user");
       addMessage("📦 Cargando opciones disponibles en tu zona... 🔍", "bot");
       
-      // Cargar TODOS los encomendistas
-      const puntosDisponibles = await cargarEncomiendistas("PUNTO FIJO");
-      const casilleroDisponibles = await cargarEncomiendistas("CASILLERO");
+      // Cargar encomendistas de la zona (el script filtra automáticamente)
+      const puntosDisponibles = await cargarEncomiendistas("PUNTO FIJO", departamento, municipio);
+      const casilleroDisponibles = await cargarEncomiendistas("CASILLERO", departamento, municipio);
       
-      // Filtrar por zona (case-insensitive)
-      const puntosFiltrados = puntosDisponibles.items?.filter(
-        (enc) => enc.DEPARTAMENTO?.toUpperCase() === departamento.toUpperCase() && 
-                 enc.MUNICIPIO?.toUpperCase() === municipio.toUpperCase()
-      ) || [];
-      
-      const casillerosFiltrados = casilleroDisponibles.items?.filter(
-        (enc) => enc.DEPARTAMENTO?.toUpperCase() === departamento.toUpperCase() && 
-                 enc.MUNICIPIO?.toUpperCase() === municipio.toUpperCase()
-      ) || [];
+      // Ya están filtrados por el script, no necesitamos filtrar en el cliente
+      const puntosFiltrados = puntosDisponibles.items || [];
+      const casillerosFiltrados = casilleroDisponibles.items || [];
       
       // Guardar en sessionData
       setSessionData((prev) => ({
@@ -1299,6 +1298,11 @@ export default function ChatBot( ) {
         casillerosFiltrados: casillerosFiltrados,
         tipoFiltroActual: "PUNTO FIJO",
       }));
+      
+      console.log("Departamento:", departamento);
+      console.log("Municipio:", municipio);
+      console.log("Puntos filtrados:", puntosFiltrados);
+      console.log("Casilleros filtrados:", casillerosFiltrados);
       
       // Mostrar el carrusel con filtros en la parte superior
       if (puntosFiltrados.length > 0) {
