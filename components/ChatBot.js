@@ -1282,15 +1282,10 @@ if (input.startsWith("muni_envio_")) {
   );
   const mostrarPuntoFijo = totalProductos < 3;
 
-  // Buscar encomiendistas disponibles
+  // Buscar encomiendistas disponibles - CARGAR TODOS Y FILTRAR LOCALMENTE
   try {
-    const urlPuntoFijo = `${SCRIPT_URL}?route=encomiendas&tipo_entrega=PUNTO FIJO&departamento=${encodeURIComponent(
-      session.departamento
-    )}&municipio=${encodeURIComponent(municipio)}`;
-    
-    const urlCasillero = `${SCRIPT_URL}?route=encomiendas&tipo_entrega=CASILLERO&departamento=${encodeURIComponent(
-      session.departamento
-    )}&municipio=${encodeURIComponent(municipio)}`;
+    const urlPuntoFijo = `${SCRIPT_URL}?route=encomiendas&tipo_entrega=PUNTO FIJO`;
+    const urlCasillero = `${SCRIPT_URL}?route=encomiendas&tipo_entrega=CASILLERO`;
 
     const [resPuntoFijo, resCasillero] = await Promise.all([
       fetch(urlPuntoFijo),
@@ -1300,8 +1295,21 @@ if (input.startsWith("muni_envio_")) {
     const dataPuntoFijo = await resPuntoFijo.json();
     const dataCasillero = await resCasillero.json();
 
-    const hayPuntoFijo = !dataPuntoFijo.error && dataPuntoFijo.items?.length > 0;
-    const hayCasillero = !dataCasillero.error && dataCasillero.items?.length > 0;
+    // Filtrar por departamento y municipio
+    const puntosFijos = (dataPuntoFijo.items || []).filter(
+      (enc) =>
+        enc.DEPARTAMENTO?.toUpperCase() === session.departamento.toUpperCase() &&
+        enc.MUNICIPIO?.toUpperCase() === municipio.toUpperCase()
+    );
+
+    const casilleros = (dataCasillero.items || []).filter(
+      (enc) =>
+        enc.DEPARTAMENTO?.toUpperCase() === session.departamento.toUpperCase() &&
+        enc.MUNICIPIO?.toUpperCase() === municipio.toUpperCase()
+    );
+
+    const hayPuntoFijo = puntosFijos.length > 0;
+    const hayCasillero = casilleros.length > 0;
 
     // Construir opciones disponibles
     const opciones = [
@@ -1311,40 +1319,35 @@ if (input.startsWith("muni_envio_")) {
     // Solo agregar Punto Fijo si existe Y tiene menos de 3 productos
     if (hayPuntoFijo && mostrarPuntoFijo) {
       opciones.push({ label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" });
-      // Guardar encomiendistas de punto fijo
-      setEncomiendistas(dataPuntoFijo.items || []);
     }
 
     if (hayCasillero) {
       opciones.push({ label: "📦 CASILLERO", value: "tipo_casillero" });
-      // Si no había punto fijo, guardar casilleros
-      if (!hayPuntoFijo || !mostrarPuntoFijo) {
-        setEncomiendistas(dataCasillero.items || []);
-      }
     }
 
     opciones.push({ label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" });
 
+    // Guardar las listas filtradas en sessionData
     setSessionData((prev) => ({
       ...prev,
       step: "seleccionar_tipo_envio",
-      // Guardar ambas listas para uso posterior
-      encomiendistas_punto_fijo: dataPuntoFijo.items || [],
-      encomiendistas_casillero: dataCasillero.items || [],
+      encomiendistas_punto_fijo: puntosFijos,
+      encomiendistas_casillero: casilleros,
     }));
 
     let mensajeOpciones = `📍 ${session.departamento} - ${municipio}\n\n`;
     if (hayPuntoFijo && mostrarPuntoFijo) {
-      mensajeOpciones += `✅ ${dataPuntoFijo.items.length} punto(s) fijo(s) disponible(s)\n`;
+      mensajeOpciones += `✅ ${puntosFijos.length} punto(s) fijo(s) disponible(s)\n`;
     }
     if (hayCasillero) {
-      mensajeOpciones += `✅ ${dataCasillero.items.length} casillero(s) disponible(s)\n`;
+      mensajeOpciones += `✅ ${casilleros.length} casillero(s) disponible(s)\n`;
     }
     mensajeOpciones += `\n¿Cómo deseas recibir tu pedido?`;
 
     addMessage(mensajeOpciones, "bot", opciones);
 
   } catch (e) {
+    console.error("Error buscando encomiendistas:", e);
     // Si falla la búsqueda, ofrecer las opciones básicas
     setSessionData((prev) => ({
       ...prev,
@@ -1362,6 +1365,7 @@ if (input.startsWith("muni_envio_")) {
   }
   return;
 }
+
     // 5) TIPO DE ENTREGA
     if (input === "tipo_punto_fijo") {
   setSessionData((prev) => ({
