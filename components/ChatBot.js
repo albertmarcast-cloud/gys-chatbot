@@ -1230,22 +1230,33 @@ export default function ChatBot( ) {
 
     // NUEVO: Seleccionar Departamento
     if (input.startsWith("depto_")) {
-      const departamento = input.replace("depto_", "");
+      // Extraer el departamento del input
+      const departamentoInput = input.replace("depto_", "");
+      
+      // Buscar la clave exacta en DEPARTAMENTOS_MUNICIPIOS (case-sensitive)
+      const departamentoExacto = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
+        (key) => key === departamentoInput
+      );
+      
+      if (!departamentoExacto) {
+        addMessage("❌ Departamento no válido. Por favor, intenta de nuevo.", "bot");
+        return;
+      }
       
       // Guardar departamento en sessionData
       setSessionData((prev) => ({
         ...prev,
-        departamento: departamento,
+        departamento: departamentoExacto,
         municipio: "",
         step: "seleccionar_municipio",
       }));
       
-      addMessage(`✅ Departamento: ${departamento}`, "user");
+      addMessage(`✅ Departamento: ${departamentoExacto}`, "user");
       
       // Obtener municipios del departamento seleccionado
-      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
+      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamentoExacto] || [];
       
-      if (municipios.length > 0) {
+      if (municipios && municipios.length > 0) {
         addMessage(
           "📍 Ahora, ¿en qué MUNICIPIO?",
           "bot",
@@ -1255,7 +1266,7 @@ export default function ChatBot( ) {
           }))
         );
       } else {
-        addMessage("❌ No hay municipios disponibles para este departamento", "bot");
+        addMessage("❌ No hay municipios disponibles para este departamento.", "bot");
       }
       return;
     }
