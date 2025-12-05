@@ -1283,40 +1283,43 @@ export default function ChatBot( ) {
       
       addMessage(`✅ Municipio: ${municipio}`, "user");
       
-      // Verificar qué opciones están disponibles en su zona
+      // Cargar TODOS los encomendistas (igual que el código original)
       const puntosDisponibles = await cargarEncomiendistas("PUNTO FIJO");
       const casilleroDisponibles = await cargarEncomiendistas("CASILLERO");
       
-      // Filtrar por departamento y municipio (case-insensitive para comparar con la base de datos)
-      const puntosFiltrados = puntosDisponibles.items.filter(
+      // Filtrar por departamento y municipio (case-insensitive)
+      const puntosFiltrados = puntosDisponibles.items?.filter(
         (enc) => enc.DEPARTAMENTO?.toUpperCase() === departamento.toUpperCase() && enc.MUNICIPIO?.toUpperCase() === municipio.toUpperCase()
-      );
-      const casillerosFiltrados = casilleroDisponibles.items.filter(
+      ) || [];
+      const casillerosFiltrados = casilleroDisponibles.items?.filter(
         (enc) => enc.DEPARTAMENTO?.toUpperCase() === departamento.toUpperCase() && enc.MUNICIPIO?.toUpperCase() === municipio.toUpperCase()
-      );
+      ) || [];
       
-      // Construir opciones dinámicamente
+      // Construir opciones dinámicamente (solo mostrar si hay disponibles en la zona)
       const opciones = [];
       
       // Siempre agregar PERSONALIZADO
       opciones.push({ label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" });
       
-      // Agregar PUNTO FIJO solo si hay disponible
+      // Agregar PUNTO FIJO solo si hay disponible en su zona
       if (puntosFiltrados.length > 0) {
-        // Guardar los puntos filtrados para mostrar en el carrusel
-        setEncomiendistas(puntosFiltrados);
-        opciones.push({ label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" });
+        opciones.push({ label: "📍 PUNTO FIJO", value: "tipo_punto_fijo_zona" });
       }
       
-      // Agregar CASILLERO solo si hay disponible
+      // Agregar CASILLERO solo si hay disponible en su zona
       if (casillerosFiltrados.length > 0) {
-        // Guardar los casilleros filtrados para mostrar en el carrusel
-        setEncomiendistas(casillerosFiltrados);
-        opciones.push({ label: "📦 CASILLERO", value: "tipo_casillero" });
+        opciones.push({ label: "📦 CASILLERO", value: "tipo_casillero_zona" });
       }
       
       // Siempre agregar RETIRO EN TIENDA
       opciones.push({ label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" });
+      
+      // Guardar los encomendistas filtrados en sessionData para usar luego
+      setSessionData((prev) => ({
+        ...prev,
+        puntosFiltrados: puntosFiltrados,
+        casillerosFiltrados: casillerosFiltrados,
+      }));
       
       // Mostrar opciones dinámicas
       addMessage(
@@ -1324,6 +1327,70 @@ export default function ChatBot( ) {
         "bot",
         opciones
       );
+      return;
+    }
+
+    // NUEVO: PUNTO FIJO CON ZONA (filtrado)
+    if (input === "tipo_punto_fijo_zona") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "PUNTO FIJO",
+        step: "cargando_puntos_fijos",
+      }));
+      addMessage("📍 Buscando puntos fijos en tu zona... 🔍", "bot");
+      
+      // Usar los puntos filtrados guardados
+      const puntosFiltrados = session.puntosFiltrados || [];
+      if (puntosFiltrados.length > 0) {
+        setEncomiendistas(puntosFiltrados);
+        setEncomiendaIndex(0);
+        setShowEncomiendaCarousel(true);
+        addMessage(
+          `✨ Encontré ${puntosFiltrados.length} punto(s) fijo(s) en tu zona.\n\nUsa las flechas para navegar:`,
+          "bot"
+        );
+      } else {
+        addMessage("⚠️ No hay puntos fijos en tu zona", "bot", [
+          {
+            label: "🏠 Cambiar a PERSONALIZADO",
+            value: "tipo_personalizado",
+          },
+          { label: "📦 Ver CASILLEROS", value: "tipo_casillero_zona" },
+          { label: "📞 Contactar agente", value: "agente" },
+        ]);
+      }
+      return;
+    }
+
+    // NUEVO: CASILLERO CON ZONA (filtrado)
+    if (input === "tipo_casillero_zona") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "CASILLERO",
+        step: "cargando_casilleros",
+      }));
+      addMessage("📦 Buscando casilleros en tu zona... 🔍", "bot");
+      
+      // Usar los casilleros filtrados guardados
+      const casillerosFiltrados = session.casillerosFiltrados || [];
+      if (casillerosFiltrados.length > 0) {
+        setEncomiendistas(casillerosFiltrados);
+        setEncomiendaIndex(0);
+        setShowEncomiendaCarousel(true);
+        addMessage(
+          `✨ Encontré ${casillerosFiltrados.length} casillero(s) en tu zona.\n\nUsa las flechas para navegar:`,
+          "bot"
+        );
+      } else {
+        addMessage("⚠️ No hay casilleros en tu zona", "bot", [
+          {
+            label: "🏠 Cambiar a PERSONALIZADO",
+            value: "tipo_personalizado",
+          },
+          { label: "📍 Ver PUNTOS FIJOS", value: "tipo_punto_fijo_zona" },
+          { label: "📞 Contactar agente", value: "agente" },
+        ]);
+      }
       return;
     }
 
