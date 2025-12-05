@@ -1203,7 +1203,7 @@ export default function ChatBot( ) {
       return;
     }
 
-    // 4) CONTINUAR PEDIDO
+    // 4) CONTINUAR PEDIDO - NUEVO FLUJO CON DEPARTAMENTO Y MUNICIPIO
     if (input === "continuar_pedido") {
       if (session.carrito.length === 0) {
         addMessage(
@@ -1213,37 +1213,96 @@ export default function ChatBot( ) {
         return;
       }
       setShowCarousel(false);
-      setSessionData((prev) => ({ ...prev, step: "continuar_pedido_flotante" })); // Desactivar FAB
+      setSessionData((prev) => ({ ...prev, step: "continuar_pedido_flotante" }));
 
-      const totalProductos = session.carrito.reduce(
-        (sum, item) => sum + item.CANTIDAD,
-        0
+      // NUEVO: Preguntar por departamento primero
+      setSessionData((prev) => ({ ...prev, step: "seleccionar_departamento" }));
+      addMessage(
+        "📍 Para continuar, ¿en qué DEPARTAMENTO te encuentras?",
+        "bot",
+        Object.keys(DEPARTAMENTOS_MUNICIPIOS).map((dep) => ({
+          label: dep,
+          value: `depto_${dep}`,
+        }))
       );
-
-      if (totalProductos >= 3) {
-        setSessionData((prev) => ({ ...prev, step: "tipo_envio_3mas" }));
-        addMessage(
-          "📦 Tienes 3 o más productos\n\n¿Cómo deseas recibir tu pedido?",
-          "bot",
-          [
-            { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
-            { label: "📦 CASILLERO", value: "tipo_casillero" },
-            { label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" },
-          ]
-        );
-      } else {
-        setSessionData((prev) => ({ ...prev, step: "tipo_envio" }));
-        addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", [
-          { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
-          { label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" },
-          { label: "📦 CASILLERO", value: "tipo_casillero" },
-          { label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" },
-        ]);
-      }
       return;
     }
 
-    // 5) TIPO DE ENTREGA
+    // NUEVO: Seleccionar Departamento
+    if (input.startsWith("depto_")) {
+      const departamento = input.replace("depto_", "");
+      
+      setSessionData((prev) => ({
+        ...prev,
+        departamento: departamento,
+        step: "seleccionar_municipio",
+      }));
+      
+      addMessage(`✅ Departamento: ${departamento}`, "user");
+      addMessage(
+        "📍 Ahora, ¿en qué MUNICIPIO?",
+        "bot",
+        DEPARTAMENTOS_MUNICIPIOS[departamento].map((muni) => ({
+          label: muni,
+          value: `municipio_${muni}`,
+        }))
+      );
+      return;
+    }
+
+    // NUEVO: Seleccionar Municipio y mostrar opciones dinámicas
+    if (input.startsWith("municipio_")) {
+      const municipio = input.replace("municipio_", "");
+      
+      setSessionData((prev) => ({
+        ...prev,
+        municipio: municipio,
+        step: "tipo_envio_dinamico",
+      }));
+      
+      addMessage(`✅ Municipio: ${municipio}`, "user");
+      
+      // Verificar qué opciones están disponibles en su zona
+      const puntosDisponibles = await cargarEncomiendistas("PUNTO FIJO");
+      const casilleroDisponibles = await cargarEncomiendistas("CASILLERO");
+      
+      // Filtrar por departamento y municipio
+      const puntosFiltrados = puntosDisponibles.items.filter(
+        (enc) => enc.DEPARTAMENTO === sessionData.departamento && enc.MUNICIPIO === municipio
+      );
+      const casillerosFiltrados = casilleroDisponibles.items.filter(
+        (enc) => enc.DEPARTAMENTO === sessionData.departamento && enc.MUNICIPIO === municipio
+      );
+      
+      // Construir opciones dinámicamente
+      const opciones = [];
+      
+      // Siempre agregar PERSONALIZADO
+      opciones.push({ label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" });
+      
+      // Agregar PUNTO FIJO solo si hay disponible
+      if (puntosFiltrados.length > 0) {
+        opciones.push({ label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" });
+      }
+      
+      // Agregar CASILLERO solo si hay disponible
+      if (casillerosFiltrados.length > 0) {
+        opciones.push({ label: "📦 CASILLERO", value: "tipo_casillero" });
+      }
+      
+      // Siempre agregar RETIRO EN TIENDA
+      opciones.push({ label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" });
+      
+      // Mostrar opciones dinámicas
+      addMessage(
+        `📦 ¿Cómo prefieres recibir tu pedido?`,
+        "bot",
+        opciones
+      );
+      return;
+    }
+
+        // 5) TIPO DE ENTREGA
     if (input === "tipo_personalizado") {
       setSessionData((prev) => ({
         ...prev,
