@@ -315,7 +315,7 @@ const DEPARTAMENTOS_MUNICIPIOS = {
 // ======================
 //  COMPONENTE PRINCIPAL
 // ======================
-export default function ChatBot(  ) {
+export default function ChatBot( ) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [catalogo, setCatalogo] = useState([]);
@@ -394,9 +394,10 @@ export default function ChatBot(  ) {
   const cargarCatalogo = async (categoria = "") => {
     setLoadingCatalog(true);
     try {
-      // 1. Cargar SIEMPRE el catálogo completo para obtener todas las categorías
       let url = `${SCRIPT_URL}?route=catalog&limit=100`;
-      // Se elimina el filtro por categoría en la URL para cargar todo
+      if (categoria && categoria !== "todos") {
+        url += `&categoria=${encodeURIComponent(categoria)}`;
+      }
       const res = await fetch(url);
       const data = await res.json();
 
@@ -407,7 +408,7 @@ export default function ChatBot(  ) {
         const items = data.items || [];
         setCatalogo(items);
 
-        // Extraer categorías únicas y dinámicas de TODO el catálogo
+        // Extraer categorías únicas y dinámicas
         if (items.length > 0) {
           const categorias = [
             ...new Set(
@@ -416,12 +417,9 @@ export default function ChatBot(  ) {
           ];
           setCategoriasDinamicas(categorias);
         }
-        
-        // El mensaje debe reflejar el catálogo filtrado (si aplica)
-        const filteredItems = getFilteredCatalog(); // Usar la función de filtrado local
-        if (filteredItems.length > 0) {
+        if (data.items && data.items.length > 0) {
           addMessage(
-            `✨ Encontré ${filteredItems.length} productos disponibles. Usa las flechas para navegar:`,
+            `✨ Encontré ${data.items.length} productos disponibles. Usa las flechas para navegar:`,
             "bot"
           );
         } else {
@@ -438,21 +436,12 @@ export default function ChatBot(  ) {
   // ===================================
   //   CARGAR ENCOMIENDISTAS DESDE SCRIPT
   // ===================================
-  const cargarEncomiendistas = async (tipoEnvio, departamento = "", municipio = "") => {
+  const cargarEncomiendistas = async (tipoEnvio) => {
     setLoadingEncomiendas(true);
     try {
-      let url = `${SCRIPT_URL}?route=encomiendas&tipo_entrega=${encodeURIComponent(
+      const url = `${SCRIPT_URL}?route=encomiendas&tipo_entrega=${encodeURIComponent(
         tipoEnvio
       )}`;
-
-      // **NUEVA LÓGICA DE FILTRADO POR UBICACIÓN**
-      if (departamento) {
-        url += `&departamento=${encodeURIComponent(departamento)}`;
-      }
-      if (municipio) {
-        url += `&municipio=${encodeURIComponent(municipio)}`;
-      }
-
       const res = await fetch(url);
       const data = await res.json();
 
@@ -785,24 +774,30 @@ export default function ChatBot(  ) {
 
       // Mostrar incentivo solo si el precio baja y cumple la condición de "faltan"
       if (targetQty > 0 && targetPrice < group.precio) {
-        const ahorro = (group.precio - targetPrice) * targetQty;
-        texto += `\n✨ *INCENTIVO ${group.categoria.toUpperCase()}*:\n`;
-        texto += `  ¡Te faltan ${remaining} para llevar ${targetName} y ahorrar $${ahorro.toFixed(
-          2
-        )}!\n`;
+        let mostrar = false;
+        if (targetQty === 2 && remaining === 1) mostrar = true;
+        if (targetQty === 6 && (remaining === 1 || remaining === 2))
+          mostrar = true;
+        if (targetQty === 12 && (remaining === 1 || remaining === 2))
+          mostrar = true;
+        if (targetQty === 30 && remaining <= 10) mostrar = true;
+
+        if (mostrar) {
+          texto += `💡 *¡Aprovecha en ${group.categoria}!*`;
+          texto += `\nSolo ${remaining} piezas más para llegar a ${targetName}.`;
+          texto += `\n¡El precio bajará automáticamente a $${targetPrice.toFixed(
+            2
+          )} c/u! 🔥\n\n`;
+        }
       }
     });
 
-    texto += `\n\n*SUBTOTAL:* $${subtotal.toFixed(2)}`;
+    texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
 
-    addMessage(texto, "bot", [
-      { label: "➕ Agregar más", value: "agregar_mas" },
-      { label: "✅ Continuar pedido", value: "continuar_pedido" },
-      { label: "❌ Cancelar", value: "cancelar" },
-    ]);
+    addMessage(texto, "bot");
   };
 
-  // Función auxiliar para calcular precio con cantidad específica (para incentivos)
+  // Helper para calcular precio con una cantidad específica (necesario para el incentivo)
   const calcularPrecioItemConCantidad = (item, metodoPago, cant) => {
     const esTransferencia = metodoPago === "Transferencia";
 
@@ -836,112 +831,158 @@ export default function ChatBot(  ) {
   // ===================================
   const mostrarResumen = () => {
     const metodo = sessionData.metodo_pago || "Contra entrega";
-    const costoEnvio = Number(sessionData.costo_envio || 0);
+
     const subtotal = sessionData.carrito.reduce((sum, item) => {
       const precio = calcularPrecioItem(item, metodo);
       return sum + precio * item.CANTIDAD;
     }, 0);
-    const total = subtotal + costoEnvio;
 
-    let texto = "📝 *RESUMEN DE TU PEDIDO:*\n\n";
+    const total = subtotal + sessionData.costo_envio;
 
-    // Productos
+    let resumen = `📋 *RESUMEN DE TU PEDIDO*\n\n`;
+    resumen += `👤 ${sessionData.nombre.toUpperCase()}\n`;
+    resumen += `📱 ${sessionData.telefono.toUpperCase()}\n\n`;
+
+    resumen += `📦 *Productos (${sessionData.carrito.length}):*\n\n`;
     sessionData.carrito.forEach((item, idx) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
-      texto += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA}) x${
-        item.CANTIDAD
-      } → $${subItem.toFixed(2)}\n`;
+      // Formato corto para el resumen (tipo carrito)
+      resumen += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
+      resumen += `   Cantidad: ${item.CANTIDAD} → $${subItem.toFixed(2)}\n\n`;
     });
 
-    // Envío
-    let tipoTexto = sessionData.tipo_entrega;
-    if (tipoTexto === "PERSONALIZADO") tipoTexto = "🏠 PERSONALIZADO";
-    if (tipoTexto === "PUNTO FIJO") tipoTexto = "📍 PUNTO FIJO";
-    if (tipoTexto === "CASILLERO") tipoTexto = "📦 CASILLERO";
-    if (tipoTexto === "RETIRO EN TIENDA") tipoTexto = "🏪 RETIRO EN TIENDA";
+    resumen += `💰 subtotal: $${subtotal.toFixed(2)}\n`;
+    resumen += `💵 costo_envio: $${sessionData.costo_envio.toFixed(2)}\n\n`;
+    resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
 
-    texto += `\n\n*DETALLES DEL ENVÍO:*\n`;
-    texto += `🚚 Tipo: ${tipoTexto}\n`;
-    texto += `📍 Ubicación: ${sessionData.departamento} - ${sessionData.municipio}\n`;
+    // DETALLES DEL ENVÍO (Nuevo orden solicitado)
+    resumen += `*DETALLES DEL ENVÍO:*\n\n`;
 
-    if (sessionData.punto_referencia) {
-      texto += `📌 Referencia: ${sessionData.punto_referencia}\n`;
+    let tipoEnvioTexto = sessionData.tipo_entrega;
+    if (tipoEnvioTexto === "PERSONALIZADO") tipoEnvioTexto = "🏠 PERSONALIZADO";
+    if (tipoEnvioTexto === "PUNTO FIJO") tipoEnvioTexto = "📍 PUNTO FIJO";
+    if (tipoEnvioTexto === "CASILLERO") tipoEnvioTexto = "📦 CASILLERO";
+    if (tipoEnvioTexto === "RETIRO EN TIENDA") tipoEnvioTexto = "🏪 RETIRO EN TIENDA";
+
+    resumen += `🚚 envío: ${tipoEnvioTexto}\n`;
+
+    if (sessionData.tipo_entrega !== "RETIRO EN TIENDA") {
+      resumen += `📍 departamento: ${sessionData.departamento}\n`;
+
+      let ubicacionAgrupada = sessionData.municipio;
+      if (sessionData.punto_referencia) {
+        ubicacionAgrupada += ` - ${sessionData.punto_referencia}`;
+      }
+      resumen += `📍 ${ubicacionAgrupada}\n`;
     }
 
-    if (sessionData.encomiendista_nombre) {
-      texto += `🚛 Encomendista: ${sessionData.encomiendista_nombre}\n`;
+    if (
+      sessionData.encomiendista_nombre &&
+      sessionData.tipo_entrega !== "PERSONALIZADO" &&
+      sessionData.tipo_entrega !== "RETIRO EN TIENDA"
+    ) {
+      resumen += `🚛 encomendista: ${sessionData.encomiendista_nombre}\n`;
     }
 
-    texto += `\n*COSTOS:*\n`;
-    texto += `💰 Subtotal: $${subtotal.toFixed(2)}\n`;
-    texto += `💵 Costo de Envío: $${costoEnvio.toFixed(2)}\n`;
-    texto += `💳 Método de Pago: ${metodo}\n`;
-    texto += `\n*TOTAL A PAGAR:* $${total.toFixed(2)}`;
+    let tiempoAgrupado = "";
+    if (sessionData.dia_entrega) {
+      tiempoAgrupado += `📅 ${sessionData.dia_entrega}`;
+    }
+    if (sessionData.hora_entrega) {
+      tiempoAgrupado += ` | ⏰ ${sessionData.hora_entrega}`;
+    }
+    if (tiempoAgrupado) {
+      resumen += `${tiempoAgrupado}\n\n`;
+    }
 
-    addMessage(texto, "bot", [
+    resumen += `💳 método_pago: ${sessionData.metodo_pago}\n\n`;
+
+    resumen += `¿Todo correcto?`;
+
+    addMessage(resumen, "bot", [
       { label: "✅ Confirmar pedido", value: "confirmar_pedido" },
       { label: "❌ Cancelar", value: "cancelar" },
     ]);
   };
 
   // ===================================
-  //       CREAR PEDIDO EN SCRIPT
+  //     SUBIR COMPROBANTE DESPUÉS
+  // ===================================
+  const subirComprobanteDespuesDeFactura = async (factura) => {
+    if (!sessionData.foto_comprobante_base64) return;
+    try {
+      await fetch(`${SCRIPT_URL}?route=uploadComprobante`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          factura,
+          base64: sessionData.foto_comprobante_base64,
+        }),
+      });
+      addMessage("📤 Tu comprobante fue guardado correctamente ✔️", "bot");
+    } catch (e) {
+      addMessage(
+        "⚠️ No se pudo guardar el comprobante. El asesor lo agregará manualmente.",
+        "bot"
+      );
+    }
+  };
+
+  // ===================================
+  //      CREAR PEDIDO + COMPROBANTE
   // ===================================
   const crearPedidoConComprobante = async () => {
-    addMessage("Guardando tu pedido en el sistema... 💾", "bot");
-
     const metodo = sessionData.metodo_pago || "Contra entrega";
-    const costoEnvio = Number(sessionData.costo_envio || 0);
+
     const subtotal = sessionData.carrito.reduce((sum, item) => {
       const precio = calcularPrecioItem(item, metodo);
       return sum + precio * item.CANTIDAD;
     }, 0);
-    const total = subtotal + costoEnvio;
 
-    const payload = {
-      route: "saveOrder",
-      nombre: sessionData.nombre,
+    const total = subtotal + sessionData.costo_envio;
+
+    // Recalcular precios por producto para enviar limpios al backend
+    const productos = sessionData.carrito.map((item) => {
+      const precio = calcularPrecioItem(item, metodo);
+      const subItem = precio * item.CANTIDAD;
+      return {
+        ...item,
+        PRECIO_APLICADO: precio,
+        SUBTOTAL_ITEM: subItem,
+      };
+    });
+
+    const pedido = {
       telefono: sessionData.telefono,
+      nombre: sessionData.nombre,
       departamento: sessionData.departamento,
       municipio: sessionData.municipio,
-      direccion: sessionData.punto_referencia, // Usamos punto_referencia como dirección
-      tipo_entrega: sessionData.tipo_entrega,
+      direccion: sessionData.direccion,
+      punto_referencia: sessionData.punto_referencia,
       metodo_pago: sessionData.metodo_pago,
-      costo_envio: costoEnvio,
-      subtotal: subtotal,
-      total: total,
-      encomiendista: sessionData.encomiendista_nombre,
-      comprobante_base64: sessionData.foto_comprobante_base64,
-      items: sessionData.carrito.map((item) => ({
-        codigo: item.CODIGO_INTERNO,
-        descripcion: item.DESCRIPCION,
-        talla: item.TALLA,
-        color: item.COLOR,
-        cantidad: item.CANTIDAD,
-        precio_unitario: calcularPrecioItem(item, metodo),
-        subtotal_item: calcularPrecioItem(item, metodo) * item.CANTIDAD,
-      })),
+      tipo_entrega: sessionData.tipo_entrega,
+      encomiendista: sessionData.encomiendista,
+      costo_envio: sessionData.costo_envio,
+      subtotal,
+      descuento: 0,
+      total,
+      productos,
     };
 
     try {
-      const res = await fetch(SCRIPT_URL, {
+      const res = await fetch(`${SCRIPT_URL}?route=crearPedido`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pedido),
       });
+
       const data = await res.json();
 
       if (data.success) {
-        addMessage(
-          `✅ ¡Pedido #${data.factura} guardado con éxito!`,
-          "bot"
-        );
+        addMessage(`✅ ¡Pedido #${data.factura} creado exitosamente!`, "bot");
         setSessionData((prev) => ({
           ...prev,
-          step: "finalizado",
           factura_generada: data.factura,
         }));
 
@@ -1067,12 +1108,12 @@ export default function ChatBot(  ) {
       mensaje += `⏰ hora_entrega: ${sessionData.hora_entrega}\n`;
     }
 
-    mensaje += `💳 método_pago: ${metodo}\n\n`;
+    mensaje += `💳 método_pago: ${sessionData.metodo_pago}\n\n`;
     mensaje += `✨ _Pedido desde chatbot automático_`;
 
     const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
       mensaje
-      )}`;
+     )}`;
 
     addMessage("Abriendo WhatsApp para confirmar tu pedido... 📱", "bot");
     // Usar window.location.href para máxima compatibilidad en iOS/móviles
@@ -1144,7 +1185,7 @@ export default function ChatBot(  ) {
       const msg = `Hola, soy ${session.nombre} y necesito ayuda con un pedido`;
       const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
         msg
-        )}`;
+       )}`;
       addMessage("Conectándote con un asesor... 👋", "bot");
       window.location.href = url;
       return;
@@ -1162,7 +1203,7 @@ export default function ChatBot(  ) {
       return;
     }
 
-    // 4) CONTINUAR PEDIDO -> INICIA FLUJO DE ENVÍO POR UBICACIÓN
+    // 4) CONTINUAR PEDIDO
     if (input === "continuar_pedido") {
       if (session.carrito.length === 0) {
         addMessage(
@@ -1172,210 +1213,99 @@ export default function ChatBot(  ) {
         return;
       }
       setShowCarousel(false);
-      setSessionData((prev) => ({ ...prev, step: "seleccionar_departamento_envio" })); // Nuevo paso
+      setSessionData((prev) => ({ ...prev, step: "continuar_pedido_flotante" })); // Desactivar FAB
 
+      const totalProductos = session.carrito.reduce(
+        (sum, item) => sum + item.CANTIDAD,
+        0
+      );
+
+      if (totalProductos >= 3) {
+        setSessionData((prev) => ({ ...prev, step: "tipo_envio_3mas" }));
+        addMessage(
+          "📦 Tienes 3 o más productos\n\n¿Cómo deseas recibir tu pedido?",
+          "bot",
+          [
+            { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
+            { label: "📦 CASILLERO", value: "tipo_casillero" },
+            { label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" },
+          ]
+        );
+      } else {
+        setSessionData((prev) => ({ ...prev, step: "tipo_envio" }));
+        addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", [
+          { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
+          { label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" },
+          { label: "📦 CASILLERO", value: "tipo_casillero" },
+          { label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" },
+        ]);
+      }
+      return;
+    }
+
+    // 5) TIPO DE ENTREGA
+    if (input === "tipo_personalizado") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "PERSONALIZADO",
+        costo_envio: 3.5,
+        step: "departamento_personalizado",
+      }));
       addMessage(
-        "📦 ¡Excelente! Para ver tus opciones de envío, primero dime:\n\n📍 ¿De qué departamento eres?",
+        "🏠 Envío PERSONALIZADO - $3.50\n\n📍 ¿De qué departamento eres?",
         "bot",
         Object.keys(DEPARTAMENTOS_MUNICIPIOS).map((dep) => ({
           label: dep,
-          value: `dep_envio_${dep}`,
+          value: `dep_pers_${dep}`,
         }))
       );
       return;
     }
 
-    // 5) SELECCIÓN DE DEPARTAMENTO (Manejo de la respuesta del paso 4)
-    if (session.step === "seleccionar_departamento_envio" && input.startsWith("dep_envio_")) {
-      const departamento = input.substring(10);
+    if (input === "tipo_punto_fijo") {
       setSessionData((prev) => ({
         ...prev,
-        departamento: departamento,
-        step: "seleccionar_municipio_envio", // Nuevo paso
+        tipo_entrega: "PUNTO FIJO",
+        step: "cargando_puntos_fijos",
       }));
-      addMessage(`✅ Seleccionaste *${departamento}*.\n\n¿Cuál es tu municipio?`, "bot",
-        DEPARTAMENTOS_MUNICIPIOS[departamento].map((mun) => ({
-          label: mun,
-          value: `mun_envio_${mun}`,
-        }))
-      );
-      return;
-    }
-
-    // 6) SELECCIÓN DE MUNICIPIO (Manejo de la respuesta del paso 5)
-    if (session.step === "seleccionar_municipio_envio" && input.startsWith("mun_envio_")) {
-      const municipio = input.substring(10);
-      setSessionData((prev) => ({
-        ...prev,
-        municipio: municipio,
-        step: "mostrar_opciones_envio_filtradas", // Nuevo paso
-      }));
-      // Continuar al nuevo paso para mostrar opciones filtradas
-      processMessage("mostrar_opciones_envio_filtradas");
-      return;
-    }
-
-    // 7) MOSTRAR OPCIONES DE ENVÍO FILTRADAS (Nuevo paso de lógica)
-    if (input === "mostrar_opciones_envio_filtradas") {
-      const { departamento, municipio } = session;
-      addMessage(`🔍 Buscando opciones de envío para *${departamento} - ${municipio}*...`, "bot");
-
-      // 7.1) Cargar Puntos Fijos y Casilleros para la ubicación
-      const [puntosFijos, casilleros] = await Promise.all([
-        cargarEncomiendistas("PUNTO FIJO", departamento, municipio),
-        cargarEncomiendistas("CASILLERO", departamento, municipio),
-      ]);
-
-      const opciones = [];
-
-      // 7.2) Opción 1: Retiro en Tienda (Siempre disponible)
-      opciones.push({ label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" });
-
-      // 7.3) Opción 2: Punto Fijo (Si hay disponibilidad)
-      if (puntosFijos.success && puntosFijos.items.length > 0) {
-        opciones.push({ label: `📍 PUNTO FIJO (${puntosFijos.items.length} opciones)`, value: "tipo_punto_fijo" });
-      }
-
-      // 7.4) Opción 3: Casillero (Si hay disponibilidad)
-      if (casilleros.success && casilleros.items.length > 0) {
-        opciones.push({ label: `📦 CASILLERO (${casilleros.items.length} opciones)`, value: "tipo_casillero" });
-      }
-
-      // 7.5) Opción 4: Envío Personalizado (Siempre disponible, costo fijo)
-      opciones.push({ label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" });
-
-      setSessionData((prev) => ({ ...prev, step: "seleccionar_tipo_entrega" }));
-
-      addMessage(
-        `✨ Estas son las opciones de envío disponibles para *${departamento} - ${municipio}*:\n\n¿Cuál deseas elegir?`,
-        "bot",
-        opciones
-      );
-      return;
-    }
-
-    // 8) SELECCIÓN DEL TIPO DE ENTREGA (Manejo de la respuesta del paso 7)
-    if (session.step === "seleccionar_tipo_entrega") {
-      // Lógica para TIPO_PERSONALIZADO (Ahora va directo a pedir punto de referencia)
-      if (input === "tipo_personalizado") {
-        setSessionData((prev) => ({
-          ...prev,
-          tipo_entrega: "PERSONALIZADO",
-          costo_envio: 3.5,
-          step: "punto_referencia_personalizado", // Va directo a pedir punto de referencia
-        }));
+      addMessage("📍 Buscando puntos fijos disponibles... 🔍", "bot");
+      const resultado = await cargarEncomiendistas("PUNTO FIJO");
+      if (resultado.success && resultado.items.length > 0) {
+        setEncomiendaIndex(0);
+        setShowEncomiendaCarousel(true);
         addMessage(
-          `🏠 Envío PERSONALIZADO ($3.50) a *${session.departamento} - ${session.municipio}*.\n\nPor favor, dame un punto de referencia exacto (colonia, calle, casa, etc.) para la entrega:`,
+          `✨ Encontré ${resultado.items.length} punto(s) fijo(s) disponible(s).\n\nUsa las flechas para navegar:`,
           "bot"
         );
-        return;
+      } else {
+        addMessage("⚠️ No hay puntos fijos disponibles", "bot", [
+          {
+            label: "🏠 Cambiar a PERSONALIZADO",
+            value: "tipo_personalizado",
+          },
+          { label: "📦 Ver CASILLEROS", value: "tipo_casillero" },
+          { label: "📞 Contactar agente", value: "agente" },
+        ]);
       }
-
-      // Lógica para RETIRO EN TIENDA (Ahora va directo a método de pago)
-      if (input === "tipo_retiro_tienda") {
-        setSessionData((prev) => ({
-          ...prev,
-          tipo_entrega: "RETIRO EN TIENDA",
-          costo_envio: 0,
-          departamento: "TIENDA",
-          municipio: "TIENDA",
-          punto_referencia: "RETIRO EN TIENDA",
-          encomiendista: "RETIRO EN TIENDA",
-          encomiendista_nombre: "Retiro en Tienda",
-          dia_entrega: "INMEDIATO",
-          hora_entrega: "HORARIO DE TIENDA",
-          step: "metodo_pago",
-        }));
-        addMessage(
-          "✅ Has seleccionado *RETIRO EN TIENDA*.\n\n¿Cómo deseas pagar?",
-          "bot",
-          [
-            { label: "💵 Contra entrega", value: "contra_entrega" },
-            { label: "💳 Transferencia", value: "transferencia" },
-          ]
-        );
-        return;
-      }
-
-      // Lógica para PUNTO FIJO (Ahora usa la ubicación ya seleccionada)
-      if (input === "tipo_punto_fijo") {
-        setSessionData((prev) => ({
-          ...prev,
-          tipo_entrega: "PUNTO FIJO",
-          step: "cargando_puntos_fijos",
-        }));
-        addMessage("📍 Buscando puntos fijos disponibles... 🔍", "bot");
-        // Recargar con filtros de ubicación
-        const resultado = await cargarEncomiendistas("PUNTO FIJO", session.departamento, session.municipio);
-        if (resultado.success && resultado.items.length > 0) {
-          setEncomiendaIndex(0);
-          setShowEncomiendaCarousel(true);
-          addMessage(
-            `✨ Encontré ${resultado.items.length} punto(s) fijo(s) disponible(s) en *${session.departamento} - ${session.municipio}*.\n\nUsa las flechas para navegar:`,
-            "bot"
-          );
-        } else {
-          // Esto no debería pasar si el botón se mostró, pero es un fallback
-          addMessage("⚠️ No hay puntos fijos disponibles para esta ubicación.", "bot");
-          // Volver a mostrar opciones
-          processMessage("mostrar_opciones_envio_filtradas");
-        }
-        return;
-      }
-
-      // Lógica para CASILLERO (Ahora usa la ubicación ya seleccionada)
-      if (input === "tipo_casillero") {
-        setSessionData((prev) => ({
-          ...prev,
-          tipo_entrega: "CASILLERO",
-          step: "cargando_casilleros",
-        }));
-        addMessage("📦 Buscando casilleros disponibles... 🔍", "bot");
-        // Recargar con filtros de ubicación
-        const resultado = await cargarEncomiendistas("CASILLERO", session.departamento, session.municipio);
-        if (resultado.success && resultado.items.length > 0) {
-          setEncomiendaIndex(0);
-          setShowEncomiendaCarousel(true);
-          addMessage(
-            `✨ Encontré ${resultado.items.length} casillero(s) disponible(s) en *${session.departamento} - ${session.municipio}*.\n\nUsa las flechas para navegar:`,
-            "bot"
-          );
-        } else {
-          // Esto no debería pasar si el botón se mostró, pero es un fallback
-          addMessage("⚠️ No hay casilleros disponibles para esta ubicación.", "bot");
-          // Volver a mostrar opciones
-          processMessage("mostrar_opciones_envio_filtradas");
-        }
-        return;
-      }
+      return;
     }
 
-    // 9) PUNTO DE REFERENCIA (Solo para Personalizado)
-    if (session.step === "punto_referencia_personalizado") {
+    if (input === "tipo_retiro_tienda") {
       setSessionData((prev) => ({
         ...prev,
-        punto_referencia: userInput.trim(),
-        direccion: userInput.trim(),
-        encomiendista: "PERSONALIZADO",
-        encomiendista_nombre: "Envío Personalizado",
-        dia_entrega: "1-2 días hábiles",
-        hora_entrega: "Horario de 8am a 5pm",
-        costo_envio: 3.5,
+        tipo_entrega: "RETIRO EN TIENDA",
+        costo_envio: 0,
+        departamento: "TIENDA",
+        municipio: "TIENDA",
+        punto_referencia: "RETIRO EN TIENDA",
+        encomiendista: "RETIRO EN TIENDA",
+        encomiendista_nombre: "Retiro en Tienda",
+        dia_entrega: "INMEDIATO",
+        hora_entrega: "HORARIO DE TIENDA",
         step: "metodo_pago",
       }));
-
-      // --- INCENTIVO TRANSFERENCIA (3) ---
-      const costoEnvio = Number(session.costo_envio || 0);
-      const totalContraEntrega = calcularTotalCarrito("Contra entrega", session.carrito, costoEnvio);
-      const totalTransferencia = calcularTotalCarrito("Transferencia", session.carrito, costoEnvio);
-      let incentivoTexto = "";
-      if (totalTransferencia < totalContraEntrega) {
-        incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(2)}. ¡Aprovecha el mejor precio!`;
-      }
-      // -----------------------------------
-
       addMessage(
-        `✅ Recibido.\n\n*Resumen de Envío:*\n📍 ${session.departamento} - ${session.municipio}\n📌 ${userInput.trim()}\n💵 Costo: $${session.costo_envio.toFixed(2)}\n\n¿Cómo deseas pagar?${incentivoTexto}`,
+        "✅ Has seleccionado *RETIRO EN TIENDA*.\n\n¿Cómo deseas pagar?",
         "bot",
         [
           { label: "💵 Contra entrega", value: "contra_entrega" },
@@ -1385,7 +1315,124 @@ export default function ChatBot(  ) {
       return;
     }
 
-    // 10) MÉTODO DE PAGO
+    if (input === "tipo_casillero") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "CASILLERO",
+        step: "cargando_casilleros",
+      }));
+      addMessage("📦 Buscando casilleros disponibles... 🔍", "bot");
+      const resultado = await cargarEncomiendistas("CASILLERO");
+      if (resultado.success && resultado.items.length > 0) {
+        setEncomiendaIndex(0);
+        setShowEncomiendaCarousel(true);
+        addMessage(
+          `✨ Encontré ${resultado.items.length} casillero(s) disponible(s).\n\nUsa las flechas para navegar:`,
+          "bot"
+        );
+      } else {
+        addMessage("⚠️ No hay casilleros disponibles", "bot", [
+          {
+            label: "🏠 Cambiar a PERSONALIZADO",
+            value: "tipo_personalizado",
+          },
+          { label: "📍 Ver PUNTOS FIJOS", value: "tipo_punto_fijo" },
+          { label: "📞 Contactar agente", value: "agente" },
+        ]);
+      }
+      return;
+    }
+
+    // 6) PERSONALIZADO: DPTO / MUNICIPIO / REFERENCIA
+    if (input.startsWith("dep_pers_")) {
+      const departamentoInput = input.replace("dep_pers_", "");
+      const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
+        (k) => k.toLowerCase() === departamentoInput.toLowerCase()
+      );
+      const departamento = departamentoKey || departamentoInput;
+      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
+
+      if (!municipios.length) {
+        addMessage(
+          `⚠️ No se encontraron municipios para ${departamentoInput}.`,
+          "bot",
+          [{ label: "📞 Contactar agente", value: "agente" }]
+        );
+        return;
+      }
+
+      setSessionData((prev) => ({
+        ...prev,
+        departamento,
+        step: "municipio_personalizado",
+      }));
+      addMessage(
+        `${departamento} 📍\n\n¿De qué municipio?`,
+        "bot",
+        municipios.map((muni) => ({
+          label: muni,
+          value: `muni_pers_${muni}`,
+        }))
+      );
+      return;
+    }
+
+    if (input.startsWith("muni_pers_")) {
+      const municipio = input.replace("muni_pers_", "");
+      setSessionData((prev) => ({
+        ...prev,
+        municipio,
+        step: "punto_referencia_personalizado",
+      }));
+      addMessage(
+        `📍 ${session.departamento} - ${municipio}\n\n¿Cuál es tu punto de referencia?\n(Ej: Frente a gasolinera Shell)`,
+        "bot"
+      );
+      return;
+    }
+
+    if (session.step === "punto_referencia_personalizado") {
+      setSessionData((prev) => ({
+        ...prev,
+        punto_referencia: userInput.trim(),
+        direccion: userInput.trim(),
+        encomiendista: "PERSONALIZADO",
+        encomiendista_nombre: "Envío Personalizado",
+        step: "metodo_pago",
+      }));
+
+      // --- INCENTIVO TRANSFERENCIA (3) ---
+      const costoEnvio = 3.5; // Costo fijo para envío personalizado
+      const totalContraEntrega = calcularTotalCarrito(
+        "Contra entrega",
+        session.carrito,
+        costoEnvio
+      );
+      const totalTransferencia = calcularTotalCarrito(
+        "Transferencia",
+        session.carrito,
+        costoEnvio
+      );
+      let incentivoTexto = "";
+      if (totalTransferencia < totalContraEntrega) {
+        incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(
+          2
+        )}. ¡Aprovecha el mejor precio!`;
+      }
+      // -----------------------------------
+
+      addMessage(
+        `🏠 Punto de referencia registrado\n💵 Costo de envío: $3.50\n\n¿Cómo deseas pagar?${incentivoTexto}`,
+        "bot",
+        [
+          { label: "💵 Contra entrega", value: "contra_entrega" },
+          { label: "💳 Transferencia", value: "transferencia" },
+        ]
+      );
+      return;
+    }
+
+    // 7) MÉTODO DE PAGO
     if (input === "contra_entrega") {
       setSessionData((prev) => ({
         ...prev,
@@ -1436,7 +1483,7 @@ export default function ChatBot(  ) {
       return;
     }
 
-    // 11) CONFIRMAR / CANCELAR
+    // 8) CONFIRMAR / CANCELAR
     if (input === "confirmar_pedido") {
       await crearPedidoConComprobante();
       return;
@@ -1455,13 +1502,436 @@ export default function ChatBot(  ) {
   };
 
   // ===================================
-  //           RENDERIZADO
+  //      HANDLERS DE INPUT / BOTONES
   // ===================================
-  // ... (El resto del código de renderizado permanece igual)
-  
+  const handleSend = () => {
+    if (!input.trim()) return;
+    processMessage(input);
+    setInput("");
+  };
+
+  const handleOptionClick = (value) => {
+    processMessage(value);
+  };
+
+  const handleCarouselNav = (direction) => {
+    const filtered = getFilteredCatalog();
+    if (!filtered.length) return;
+    if (direction === "next") {
+      setCarouselIndex((prev) => (prev + 1) % filtered.length);
+    } else {
+      setCarouselIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
+    }
+    setSelectedTalla("");
+    setCantidad(1);
+  };
+
+  const filtered = getFilteredCatalog();
+  const currentProduct = filtered[carouselIndex];
+
+  // ===================================
+  //               UI
+  // ===================================
   return (
-    <div className="chat-container">
-      {/* ... (Contenido del chat) ... */}
+    <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 to-purple-50">
+      <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-4 shadow-lg">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <ShoppingBag className="w-8 h-8" />
+            <div>
+              <h1 className="text-xl font-bold">GyS Importadora</h1>
+              <p className="text-sm opacity-90">Ropa y accesorios 💚</p>
+            </div>
+          </div>
+          {sessionData.carrito.length > 0 && (
+            <div className="bg-white/20 px-3 py-1 rounded-full text-sm">
+              🛒 {sessionData.carrito.length}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-4xl mx-auto w-full pb-20">
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`flex ${
+              msg.sender === "user" ? "justify-end" : "justify-start"
+            }`}
+          >
+            <div
+              className={`max-w-[80%] ${
+                msg.sender === "user"
+                  ? "bg-purple-500 text-white"
+                  : "bg-white text-gray-800"
+              } rounded-2xl px-4 py-3 shadow-md`}
+            >
+              <p className="whitespace-pre-wrap">{msg.text}</p>
+              {msg.options && (
+                <div
+                  className={`mt-3 ${
+                    msg.options.length > 6 ? "max-h-96 overflow-y-auto" : ""
+                  }`}
+                >
+                  <div
+                    className={`grid ${
+                      msg.options.length > 6 ? "grid-cols-2" : "grid-cols-1"
+                    } gap-2`}
+                  >
+                    {msg.options.map((opt, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleOptionClick(opt.value)}
+                        className="w-full bg-gradient-to-r from-pink-400 to-purple-500 text-white px-4 py-2 rounded-lg hover:from-pink-500 hover:to-purple-600 transition-all text-sm font-medium text-left"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {/* COMPONENTE TOAST (Notificación Temporal) */}
+        {toastMessage && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+            <div
+              className={`bg-white text-gray-800 rounded-xl shadow-2xl p-3 flex items-center gap-2 border ${
+                toastMessage.includes("⚠️")
+                  ? "border-yellow-500"
+                  : "border-green-500"
+              }`}
+            >
+              <span className="text-lg">
+                {toastMessage.includes("⚠️") ? "⚠️" : "✅"}
+              </span>
+              <span className="font-medium">
+                {toastMessage.replace(/⚠️|✅/g, "").trim()}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {loadingEncomiendas && (
+          <div className="flex justify-center items-center">
+            <div className="bg-white rounded-xl shadow-lg p-6 flex items-center gap-3">
+              <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+              <span className="text-gray-700">Buscando opciones...</span>
+            </div>
+          </div>
+        )}
+
+        {showCarousel && (
+          <div className="bg-white rounded-xl shadow-lg p-4 mx-auto max-w-md">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-bold text-lg">🛍️ Catálogo</h3>
+              <select
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setCarouselIndex(0);
+                  cargarCatalogo(e.target.value);
+                }}
+                className="px-3 py-1 border rounded-lg text-sm"
+              >
+                <option value="todos">Todos</option>
+                {categoriasDinamicas.map((cat, i) => (
+                  <option key={i} value={cat.toLowerCase()}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {loadingCatalog ? (
+              <div className="flex justify-center items-center h-64">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+              </div>
+            ) : currentProduct ? (
+              <div className="relative">
+                <img
+                  src={(() => {
+                    let url =
+                      currentProduct.FOTO ||
+                      currentProduct["FOTO LINK"] ||
+                      "https://via.placeholder.com/300";
+                    if (url.includes("drive.google.com/uc?export=view" )) {
+                      const id = url.split("id=")[1];
+                      if (id) {
+                        url = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
+                      }
+                    }
+                    return url;
+                  } )()}
+                  alt={currentProduct.DESCRIPCION}
+                  className="w-full h-64 object-cover rounded-lg mb-3"
+                  onError={(e) => {
+                    e.target.src =
+                      "https://via.placeholder.com/300?text=Sin+Imagen";
+                  }}
+                />
+
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-lg capitalize">
+                    {currentProduct.DESCRIPCION}
+                  </h4>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">
+                      Color: {currentProduct.COLOR}
+                    </span>
+                    <span className="font-bold text-purple-600 text-lg">
+                      ${currentProduct.PRECIO_UNIDAD}
+                    </span>
+                  </div>
+
+                  {currentProduct.TALLAS_DISPONIBLES &&
+                    currentProduct.TALLAS_DISPONIBLES.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Talla:
+                        </label>
+                        <select
+                          value={selectedTalla}
+                          onChange={(e ) => setSelectedTalla(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg"
+                        >
+                          <option value="">Selecciona talla</option>
+                          {currentProduct.TALLAS_DISPONIBLES.map((t, i) => (
+                            <option key={i} value={t.etiqueta}>
+                              {t.etiqueta} (Stock: {t.stock})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Cantidad:
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={cantidad}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCantidad(val === "" ? "" : parseInt(val) || 1);
+                      }}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+
+                  <button
+                    onClick={agregarAlCarrito}
+                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Package className="w-5 h-5" />
+                    Agregar al carrito
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => handleCarouselNav("prev")}
+                  className="absolute left-2 top-28 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  onClick={() => handleCarouselNav("next")}
+                  className="absolute right-2 top-28 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+
+                <div className="text-center text-sm text-gray-500 mt-2">
+                  {carouselIndex + 1} / {filtered.length}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No hay productos disponibles
+              </div>
+            )}
+          </div>
+        )}
+
+        {showEncomiendaCarousel && encomiendistas.length > 0 && (
+          <div className="bg-white rounded-xl shadow-lg p-4 mx-auto max-w-md">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-bold text-lg">
+                {sessionData.tipo_entrega === "PUNTO FIJO"
+                  ? "📍 Puntos Fijos"
+                  : "📦 Casilleros"}
+              </h3>
+            </div>
+            {(() => {
+              const enc = encomiendistas[encomiendaIndex];
+              if (!enc) return null;
+
+              let fotoUrl = enc.FOTO_REFERENCIA || "";
+              if (fotoUrl.includes("drive.google.com/uc?export=view")) {
+                const id = fotoUrl.split("id=")[1];
+                if (id) {
+                  fotoUrl = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
+                }
+              }
+
+              return (
+                <div className="relative">
+                  {fotoUrl && (
+                    <img
+                      src={fotoUrl}
+                      alt={enc.ENCOMIENDISTA}
+                      className="w-full h-48 object-cover rounded-lg mb-3"
+                      onError={(e ) => {
+                        e.target.src =
+                          "https://via.placeholder.com/300?text=Sin+Foto";
+                      }}
+                    />
+                   )}
+
+                  <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
+                    <h4 className="font-bold text-xl text-purple-600">
+                      {enc.ENCOMIENDISTA}
+                    </h4>
+
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-gray-500" />
+                        <span className="font-semibold">
+                          {enc.DEPARTAMENTO} - {enc.MUNICIPIO}
+                        </span>
+                      </div>
+                      {enc.PUNTO_REFERENCIA && (
+                        <div className="flex items-start gap-2">
+                          <Package className="w-4 h-4 text-gray-500 mt-0.5" />
+                          <span>{enc.PUNTO_REFERENCIA}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-green-600" />
+                        <span className="font-bold text-green-600 text-lg">
+                          ${enc.COSTO_ENVIO}
+                        </span>
+                      </div>
+                      {enc.DIA_ENTREGA && (
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-gray-500" />
+                          <span>{enc.DIA_ENTREGA}</span>
+                        </div>
+                      )}
+                      {enc.HORA_ENTREGA && (
+                        <div className="flex items-center gap-2 ml-6">
+                          <span className="text-gray-600">
+                            ⏰ {enc.HORA_ENTREGA}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={seleccionarEncomienda}
+                      className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 mt-4"
+                    >
+                      <Truck className="w-5 h-5" />
+                      Elegir esta opción
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => handleEncomiendaNav("prev")}
+                    className="absolute left-2 top-20 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={() => handleEncomiendaNav("next")}
+                    className="absolute right-2 top-20 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+
+                  <div className="text-center text-sm text-gray-500 mt-2">
+                    Opción {encomiendaIndex + 1} de {encomiendistas.length}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* BARRA DE ACCIONES FLOTANTE (FAB) */}
+      {(sessionData.step === "menu_flotante" || sessionData.step === "menu") && (
+        <div className="fixed bottom-20 left-0 right-0 z-10">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="bg-white p-3 rounded-xl shadow-2xl flex justify-around gap-2 border border-purple-200">
+              <button
+                onClick={() => handleOptionClick("agregar_mas")}
+                className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:from-pink-600 hover:to-purple-700 transition-all"
+              >
+                ➕ Agregar más
+              </button>
+              <button
+                onClick={() => handleOptionClick("ver_carrito")}
+                className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-purple-600 transition-all"
+              >
+                🛒 Ver Carrito
+              </button>
+              <button
+                onClick={() => handleOptionClick("continuar_pedido")}
+                className="flex-1 bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-green-600 transition-all"
+              >
+                ✅ Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FOOTER INPUT */}
+      <div className="bg-white border-t p-4 shadow-lg">
+        <div className="max-w-4xl mx-auto flex gap-2 items-center">
+          {/* Input de texto */}
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            placeholder="Escribe tu mensaje..."
+            className="flex-1 px-4 py-3 border-2 border-purple-200 rounded-full focus:outline-none focus:border-purple-500"
+          />
+
+          {/* Input de archivo oculto */}
+          <input
+            id="fileInput"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleFileUpload(e.target.files[0])}
+          />
+
+          {/* Botón cámara */}
+          <label
+            htmlFor="fileInput"
+            className="bg-purple-500 text-white p-3 rounded-full cursor-pointer hover:bg-purple-600 transition-all"
+          >
+            📷
+          </label>
+
+          {/* Botón enviar */}
+          <button
+            onClick={handleSend}
+            className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-3 rounded-full hover:from-pink-600 hover:to-purple-700 transition-all"
+          >
+            <Send className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
