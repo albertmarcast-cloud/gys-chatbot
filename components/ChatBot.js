@@ -1228,46 +1228,44 @@ export default function ChatBot( ) {
       return;
     }
 
-    // NUEVO: Seleccionar Departamento
+    // NUEVO: Seleccionar Departamento (usando la misma lógica que departamento_personalizado)
     if (input.startsWith("depto_")) {
-      // Extraer el departamento del input
       const departamentoInput = input.replace("depto_", "");
       
-      // Buscar la clave exacta en DEPARTAMENTOS_MUNICIPIOS (case-sensitive)
-      const departamentoExacto = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
-        (key) => key === departamentoInput
+      // Usar .toLowerCase() para comparar case-insensitive (como en el código original)
+      const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
+        (k) => k.toLowerCase() === departamentoInput.toLowerCase()
       );
+      const departamento = departamentoKey || departamentoInput;
+      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
       
-      if (!departamentoExacto) {
-        addMessage("❌ Departamento no válido. Por favor, intenta de nuevo.", "bot");
+      if (!municipios.length) {
+        addMessage(
+          `⚠️ No se encontraron municipios para ${departamentoInput}.`,
+          "bot",
+          [{ label: "🔄 Intentar de nuevo", value: "continuar_pedido" }]
+        );
         return;
       }
       
       // Guardar departamento en sessionData
       setSessionData((prev) => ({
         ...prev,
-        departamento: departamentoExacto,
-        municipio: "",
+        departamento,
         step: "seleccionar_municipio",
       }));
       
-      addMessage(`✅ Departamento: ${departamentoExacto}`, "user");
-      
-      // Obtener municipios del departamento seleccionado
-      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamentoExacto] || [];
-      
-      if (municipios && municipios.length > 0) {
-        addMessage(
-          "📍 Ahora, ¿en qué MUNICIPIO?",
-          "bot",
-          municipios.map((muni) => ({
-            label: muni,
-            value: `municipio_${muni}`,
-          }))
-        );
-      } else {
-        addMessage("❌ No hay municipios disponibles para este departamento.", "bot");
-      }
+      addMessage(`✅ Departamento: ${departamento}`, "user");
+      addMessage(
+        `${departamento} 📍
+
+¿De qué municipio?`,
+        "bot",
+        municipios.map((muni) => ({
+          label: muni,
+          value: `municipio_${muni}`,
+        }))
+      );
       return;
     }
 
