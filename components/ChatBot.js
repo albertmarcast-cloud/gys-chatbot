@@ -1232,7 +1232,7 @@ export default function ChatBot( ) {
     if (input.startsWith("depto_")) {
       const departamento = input.replace("depto_", "");
       
-      // Actualizar sessionData ANTES de mostrar los municipios
+      // Guardar departamento en sessionData
       setSessionData((prev) => ({
         ...prev,
         departamento: departamento,
@@ -1264,6 +1264,7 @@ export default function ChatBot( ) {
     if (input.startsWith("municipio_")) {
       const municipio = input.replace("municipio_", "");
       
+      // Guardar municipio en sessionData
       setSessionData((prev) => ({
         ...prev,
         municipio: municipio,
