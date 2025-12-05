@@ -1287,12 +1287,12 @@ export default function ChatBot( ) {
       const puntosDisponibles = await cargarEncomiendistas("PUNTO FIJO");
       const casilleroDisponibles = await cargarEncomiendistas("CASILLERO");
       
-      // Filtrar por departamento y municipio (usando las variables locales, no sessionData)
+      // Filtrar por departamento y municipio (case-insensitive para comparar con la base de datos)
       const puntosFiltrados = puntosDisponibles.items.filter(
-        (enc) => enc.DEPARTAMENTO === departamento && enc.MUNICIPIO === municipio
+        (enc) => enc.DEPARTAMENTO?.toUpperCase() === departamento.toUpperCase() && enc.MUNICIPIO?.toUpperCase() === municipio.toUpperCase()
       );
       const casillerosFiltrados = casilleroDisponibles.items.filter(
-        (enc) => enc.DEPARTAMENTO === departamento && enc.MUNICIPIO === municipio
+        (enc) => enc.DEPARTAMENTO?.toUpperCase() === departamento.toUpperCase() && enc.MUNICIPIO?.toUpperCase() === municipio.toUpperCase()
       );
       
       // Construir opciones dinámicamente
