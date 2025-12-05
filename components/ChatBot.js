@@ -1272,6 +1272,10 @@ export default function ChatBot( ) {
     // 4.2) MUNICIPIO DE ENVÍO - MOSTRAR OPCIONES DISPONIBLES
     if (input.startsWith("muni_envio_")) {
       const municipio = input.replace("muni_envio_", "");
+      
+      // Guardar el departamento actual antes de actualizar el estado
+      const departamentoActual = session.departamento;
+      
       setSessionData((prev) => ({
         ...prev,
         municipio,
@@ -1286,9 +1290,9 @@ export default function ChatBot( ) {
         0
       );
 
-      // Consultar puntos fijos y casilleros disponibles
-      const puntosFijos = await cargarEncomiendistas("PUNTO FIJO", session.departamento, municipio);
-      const casilleros = await cargarEncomiendistas("CASILLERO", session.departamento, municipio);
+      // Consultar puntos fijos y casilleros disponibles usando el departamento guardado
+      const puntosFijos = await cargarEncomiendistas("PUNTO FIJO", departamentoActual, municipio);
+      const casilleros = await cargarEncomiendistas("CASILLERO", departamentoActual, municipio);
 
       // Construir opciones dinámicas
       const opciones = [];
@@ -1323,7 +1327,7 @@ export default function ChatBot( ) {
 
       setSessionData((prev) => ({ ...prev, step: "tipo_envio" }));
       addMessage(
-        `📍 ${session.departamento} - ${municipio}\n\n📦 ¿Cómo deseas recibir tu pedido?`,
+        `📍 ${departamentoActual} - ${municipio}\n\n📦 ¿Cómo deseas recibir tu pedido?`,
         "bot",
         opciones
       );
