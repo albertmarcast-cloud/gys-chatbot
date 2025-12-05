@@ -1232,21 +1232,31 @@ export default function ChatBot( ) {
     if (input.startsWith("depto_")) {
       const departamento = input.replace("depto_", "");
       
+      // Actualizar sessionData ANTES de mostrar los municipios
       setSessionData((prev) => ({
         ...prev,
         departamento: departamento,
+        municipio: "",
         step: "seleccionar_municipio",
       }));
       
       addMessage(`✅ Departamento: ${departamento}`, "user");
-      addMessage(
-        "📍 Ahora, ¿en qué MUNICIPIO?",
-        "bot",
-        DEPARTAMENTOS_MUNICIPIOS[departamento].map((muni) => ({
-          label: muni,
-          value: `municipio_${muni}`,
-        }))
-      );
+      
+      // Obtener municipios del departamento seleccionado
+      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
+      
+      if (municipios.length > 0) {
+        addMessage(
+          "📍 Ahora, ¿en qué MUNICIPIO?",
+          "bot",
+          municipios.map((muni) => ({
+            label: muni,
+            value: `municipio_${muni}`,
+          }))
+        );
+      } else {
+        addMessage("❌ No hay municipios disponibles para este departamento", "bot");
+      }
       return;
     }
 
