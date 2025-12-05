@@ -1080,6 +1080,45 @@ export default function ChatBot( ) {
   };
 
   // ===================================
+  // FUNCIÓN AUXILIAR: MOSTRAR OPCIONES DE ENVÍO FILTRADAS
+  // ===================================
+  const mostrarOpcionesEnvioFiltradas = async (currentSession) => {
+    const { departamento, municipio } = currentSession;
+    addMessage(`🔍 Buscando opciones de envío para *${departamento} - ${municipio}*...`, "bot");
+
+    // 7.1) Cargar Puntos Fijos y Casilleros para la ubicación
+    const [puntosFijos, casilleros] = await Promise.all([
+      cargarEncomiendistas("PUNTO FIJO", departamento, municipio),
+      cargarEncomiendistas("CASILLERO", departamento, municipio),
+    ]);
+
+    const opciones = [];
+
+    // 7.2) Opción 1: Retiro en Tienda (Siempre disponible)
+    opciones.push({ label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" });
+
+    // 7.3) Opción 2: Punto Fijo (Si hay disponibilidad)
+    if (puntosFijos.success && puntosFijos.items.length > 0) {
+      opciones.push({ label: `📍 PUNTO FIJO (${puntosFijos.items.length} opciones)`, value: "tipo_punto_fijo" });
+    }
+
+    // 7.4) Opción 3: Casillero (Si hay disponibilidad)
+    if (casilleros.success && casilleros.items.length > 0) {
+      opciones.push({ label: `📦 CASILLERO (${casilleros.items.length} opciones)`, value: "tipo_casillero" });
+    }
+
+    // 7.5) Opción 4: Envío Personalizado (Siempre disponible, costo fijo)
+    opciones.push({ label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" });
+
+    // El estado ya se actualizó en el paso 6 a "seleccionar_tipo_entrega"
+    addMessage(
+      `✨ Estas son las opciones de envío disponibles para *${departamento} - ${municipio}*:\n\n¿Cuál deseas elegir?`,
+      "bot",
+      opciones
+    );
+  };
+
+  // ===================================
   //          PROCESAR MENSAJES
   // ===================================
   const processMessage = async (userInput) => {
@@ -1205,56 +1244,21 @@ export default function ChatBot( ) {
     // 6) SELECCIÓN DE MUNICIPIO (Manejo de la respuesta del paso 5)
     if (session.step === "seleccionar_municipio_envio" && input.startsWith("mun_envio_")) {
       const municipio = input.substring(10);
-      setSessionData((prev) => ({
-        ...prev,
+      
+      // Crear el nuevo estado de sesión
+      const newSession = {
+        ...session,
         municipio: municipio,
-        step: "mostrar_opciones_envio_filtradas", // Nuevo paso
-      }));
-      // Continuar al nuevo paso para mostrar opciones filtradas
-      processMessage("mostrar_opciones_envio_filtradas");
+        step: "seleccionar_tipo_entrega", // El paso 7 espera la respuesta, el paso 6 actualiza el estado
+      };
+      
+      // Actualizar el estado y llamar a la función auxiliar con el nuevo estado
+      setSessionData(newSession);
+      await mostrarOpcionesEnvioFiltradas(newSession);
       return;
     }
 
-    // 7) MOSTRAR OPCIONES DE ENVÍO FILTRADAS (Nuevo paso de lógica)
-    if (input === "mostrar_opciones_envio_filtradas") {
-      const { departamento, municipio } = session;
-      addMessage(`🔍 Buscando opciones de envío para *${departamento} - ${municipio}*...`, "bot");
-
-      // 7.1) Cargar Puntos Fijos y Casilleros para la ubicación
-      const [puntosFijos, casilleros] = await Promise.all([
-        cargarEncomiendistas("PUNTO FIJO", departamento, municipio),
-        cargarEncomiendistas("CASILLERO", departamento, municipio),
-      ]);
-
-      const opciones = [];
-
-      // 7.2) Opción 1: Retiro en Tienda (Siempre disponible)
-      opciones.push({ label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" });
-
-      // 7.3) Opción 2: Punto Fijo (Si hay disponibilidad)
-      if (puntosFijos.success && puntosFijos.items.length > 0) {
-        opciones.push({ label: `📍 PUNTO FIJO (${puntosFijos.items.length} opciones)`, value: "tipo_punto_fijo" });
-      }
-
-      // 7.4) Opción 3: Casillero (Si hay disponibilidad)
-      if (casilleros.success && casilleros.items.length > 0) {
-        opciones.push({ label: `📦 CASILLERO (${casilleros.items.length} opciones)`, value: "tipo_casillero" });
-      }
-
-      // 7.5) Opción 4: Envío Personalizado (Siempre disponible, costo fijo)
-      opciones.push({ label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" });
-
-      setSessionData((prev) => ({ ...prev, step: "seleccionar_tipo_entrega" }));
-
-      addMessage(
-        `✨ Estas son las opciones de envío disponibles para *${departamento} - ${municipio}*:\n\n¿Cuál deseas elegir?`,
-        "bot",
-        opciones
-      );
-      return;
-    }
-
-    // 8) SELECCIÓN DEL TIPO DE ENTREGA (Manejo de la respuesta del paso 7)
+    // 7) SELECCIÓN DEL TIPO DE ENTREGA (Manejo de la respuesta del paso 6)
     if (session.step === "seleccionar_tipo_entrega") {
       // Lógica para TIPO_PERSONALIZADO (Ahora va directo a pedir punto de referencia)
       if (input === "tipo_personalizado") {
@@ -1318,7 +1322,7 @@ export default function ChatBot( ) {
           // Esto no debería pasar si el botón se mostró, pero es un fallback
           addMessage("⚠️ No hay puntos fijos disponibles para esta ubicación.", "bot");
           // Volver a mostrar opciones
-          processMessage("mostrar_opciones_envio_filtradas");
+          await mostrarOpcionesEnvioFiltradas(session);
         }
         return;
       }
@@ -1344,13 +1348,13 @@ export default function ChatBot( ) {
           // Esto no debería pasar si el botón se mostró, pero es un fallback
           addMessage("⚠️ No hay casilleros disponibles para esta ubicación.", "bot");
           // Volver a mostrar opciones
-          processMessage("mostrar_opciones_envio_filtradas");
+          await mostrarOpcionesEnvioFiltradas(session);
         }
         return;
       }
     }
 
-    // 9) PUNTO DE REFERENCIA (Solo para Personalizado)
+    // 8) PUNTO DE REFERENCIA (Solo para Personalizado)
     if (session.step === "punto_referencia_personalizado") {
       setSessionData((prev) => ({
         ...prev,
@@ -1385,7 +1389,7 @@ export default function ChatBot( ) {
       return;
     }
 
-    // 10) MÉTODO DE PAGO
+    // 9) MÉTODO DE PAGO
     if (input === "contra_entrega") {
       setSessionData((prev) => ({
         ...prev,
@@ -1436,7 +1440,7 @@ export default function ChatBot( ) {
       return;
     }
 
-    // 11) CONFIRMAR / CANCELAR
+    // 10) CONFIRMAR / CANCELAR
     if (input === "confirmar_pedido") {
       await crearPedidoConComprobante();
       return;
@@ -1458,7 +1462,6 @@ export default function ChatBot( ) {
   //           RENDERIZADO
   // ===================================
   // ... (El resto del código de renderizado permanece igual)
-  // ... (No se incluye aquí por brevedad, pero se asume que está en el archivo)
   
   return (
     <div className="chat-container">
