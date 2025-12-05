@@ -1272,6 +1272,7 @@ export default function ChatBot( ) {
     // NUEVO: Seleccionar Municipio y mostrar opciones dinámicas
     if (input.startsWith("municipio_")) {
       const municipio = input.replace("municipio_", "");
+      const departamento = session.departamento; // Usar el departamento ya guardado en sessionData
       
       // Guardar municipio en sessionData
       setSessionData((prev) => ({
@@ -1286,12 +1287,12 @@ export default function ChatBot( ) {
       const puntosDisponibles = await cargarEncomiendistas("PUNTO FIJO");
       const casilleroDisponibles = await cargarEncomiendistas("CASILLERO");
       
-      // Filtrar por departamento y municipio
+      // Filtrar por departamento y municipio (usando las variables locales, no sessionData)
       const puntosFiltrados = puntosDisponibles.items.filter(
-        (enc) => enc.DEPARTAMENTO === sessionData.departamento && enc.MUNICIPIO === municipio
+        (enc) => enc.DEPARTAMENTO === departamento && enc.MUNICIPIO === municipio
       );
       const casillerosFiltrados = casilleroDisponibles.items.filter(
-        (enc) => enc.DEPARTAMENTO === sessionData.departamento && enc.MUNICIPIO === municipio
+        (enc) => enc.DEPARTAMENTO === departamento && enc.MUNICIPIO === municipio
       );
       
       // Construir opciones dinámicamente
@@ -1302,11 +1303,15 @@ export default function ChatBot( ) {
       
       // Agregar PUNTO FIJO solo si hay disponible
       if (puntosFiltrados.length > 0) {
+        // Guardar los puntos filtrados para mostrar en el carrusel
+        setEncomiendistas(puntosFiltrados);
         opciones.push({ label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" });
       }
       
       // Agregar CASILLERO solo si hay disponible
       if (casillerosFiltrados.length > 0) {
+        // Guardar los casilleros filtrados para mostrar en el carrusel
+        setEncomiendistas(casillerosFiltrados);
         opciones.push({ label: "📦 CASILLERO", value: "tipo_casillero" });
       }
       
