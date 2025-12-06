@@ -14,7 +14,7 @@ import {
 
 // URL de tu Apps Script
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxTR62KpdaoUB2S94a7NzY_J1oq7SuEFL1EHSCvShQAt8n3mqOrRbtZgeYrrENHvHJ7/exec";
+  "https://script.google.com/macros/s/AKfycbw7LP5JTdlfg6X5yE5Rr9jzDdT_93WxySpS1tiJ9y9iHzl1ZXgbsxM4vqyt3Di3g_Vr/exec";
 
 // WhatsApp del negocio
 const WHATSAPP_NEGOCIO = "50375936319";
@@ -352,9 +352,8 @@ export default function ChatBot() {
   const [categoriasDinamicas, setCategoriasDinamicas] = useState([]);
   const [selectedTalla, setSelectedTalla] = useState("");
   const [cantidad, setCantidad] = useState(1);
-  const [toastMessage, setToastMessage] = useState(null); // Nuevo estado para el Toast
+  const [toastMessage, setToastMessage] = useState(null);
   
-  // CAMBIO 1: NUEVOS ESTADOS PARA ENVÍO INTELIGENTE
   const [departamentoSeleccionado, setDepartamentoSeleccionado] = useState("");
   const [municipioSeleccionado, setMunicipioSeleccionado] = useState("");
 
@@ -368,7 +367,6 @@ export default function ChatBot() {
     scrollToBottom();
   }, [messages]);
 
-  // Lógica para ocultar el Toast después de 3 segundos
   useEffect(() => {
     if (toastMessage) {
       const timer = setTimeout(() => {
@@ -392,9 +390,6 @@ export default function ChatBot() {
     ]);
   };
 
-  // ===================================
-  //     CARGAR CATÁLOGO DESDE SCRIPT
-  // ===================================
   const cargarCatalogo = async (categoria = "") => {
     setLoadingCatalog(true);
     try {
@@ -412,7 +407,6 @@ export default function ChatBot() {
         const items = data.items || [];
         setCatalogo(items);
 
-        // Extraer categorías únicas y dinámicas
         if (items.length > 0 && categoriasDinamicas.length === 0) {
           const categorias = [
             ...new Set(
@@ -437,10 +431,6 @@ export default function ChatBot() {
     setLoadingCatalog(false);
   };
 
-  // ===================================
-  //   CARGAR ENCOMIENDISTAS DESDE SCRIPT
-  // ===================================
-  // CAMBIO 2: Modificar función para aceptar departamento y municipio
   const cargarEncomiendistas = async (tipoEnvio, departamento = "", municipio = "") => {
     setLoadingEncomiendas(true);
     try {
@@ -472,9 +462,6 @@ export default function ChatBot() {
     }
   };
 
-  // ===================================
-  //      NAVEGAR ENTRE ENCOMIENDISTAS
-  // ===================================
   const handleEncomiendaNav = (direction) => {
     if (!encomiendistas.length) return;
     if (direction === "next") {
@@ -486,9 +473,6 @@ export default function ChatBot() {
     }
   };
 
-  // ===================================
-  //       SELECCIONAR ENCOMIENDISTA
-  // ===================================
   const seleccionarEncomienda = () => {
     const enc = encomiendistas[encomiendaIndex];
     if (!enc) return;
@@ -512,7 +496,6 @@ export default function ChatBot() {
     const tipoTexto =
       sessionData.tipo_entrega === "PUNTO FIJO" ? "punto fijo" : "casillero";
 
-    // --- INCENTIVO TRANSFERENCIA (3) ---
     const costoEnvio = enc.COSTO_ENVIO;
     const totalContraEntrega = calcularTotalCarrito(
       "Contra entrega",
@@ -530,7 +513,6 @@ export default function ChatBot() {
         2
       )}. ¡Aprovecha el mejor precio!`;
     }
-    // -----------------------------------
 
     addMessage(
       `✅ Seleccionaste ${tipoTexto}: ${enc.ENCOMIENDISTA}\n📍 ${enc.DEPARTAMENTO} - ${enc.MUNICIPIO}\n🏪 ${enc.PUNTO_REFERENCIA}\n💵 Costo: $${enc.COSTO_ENVIO}\n\n¿Cómo deseas pagar?${incentivoTexto}`,
@@ -542,9 +524,6 @@ export default function ChatBot() {
     );
   };
 
-  // ===================================
-  //   FILTRAR CATÁLOGO POR CATEGORÍA
-  // ===================================
   const getFilteredCatalog = () => {
     if (selectedCategory === "todos") return catalogo;
     return catalogo.filter((item) =>
@@ -554,9 +533,6 @@ export default function ChatBot() {
     );
   };
 
-  // ===================================
-  //   PRECIO BÁSICO (CATÁLOGO PREVIEW)
-  // ===================================
   const calcularPrecioPreview = (producto, cant) => {
     if (cant >= 30)
       return producto.PRECIO_CAJA_MAYOR30 || producto.PRECIO_UNIDAD;
@@ -566,9 +542,6 @@ export default function ChatBot() {
     return producto.PRECIO_UNIDAD;
   };
 
-  // ===================================
-  //   PRECIO POR ITEM (CON TRANSFERENCIA)
-  // ===================================
   const calcularPrecioItem = (item, metodoPago) => {
     const cant = Number(item.CANTIDAD || 1);
     const esTransferencia = metodoPago === "Transferencia";
@@ -598,9 +571,6 @@ export default function ChatBot() {
     return precioUnidad;
   };
 
-  // ===================================
-  //     CALCULAR TOTAL DEL CARRITO
-  // ===================================
   const calcularTotalCarrito = (metodoPago, carrito, costoEnvio) => {
     const subtotal = carrito.reduce((sum, item) => {
       const precio = calcularPrecioItem(item, metodoPago);
@@ -609,9 +579,6 @@ export default function ChatBot() {
     return subtotal + costoEnvio;
   };
 
-  // ===================================
-  //     AGREGAR PRODUCTO AL CARRITO
-  // ===================================
   const agregarAlCarrito = () => {
     const filtered = getFilteredCatalog();
     const currentProduct = filtered[carouselIndex];
@@ -622,7 +589,6 @@ export default function ChatBot() {
       return;
     }
 
-    // Precio preliminar solo para mostrar (se recalcula luego según método de pago)
     const precioPre = calcularPrecioPreview(currentProduct, cantidad);
 
     const newItem = {
@@ -634,21 +600,18 @@ export default function ChatBot() {
       COLOR: currentProduct.COLOR,
       CANTIDAD: cantidad,
 
-      // Precios normales
       PRECIO_UNIDAD: currentProduct.PRECIO_UNIDAD,
       PRECIO_PAR: currentProduct.PRECIO_PAR,
       PRECIO_MEDIADOCENA: currentProduct.PRECIO_MEDIADOCENA,
       PRECIO_DOCENA: currentProduct.PRECIO_DOCENA,
       PRECIO_CAJA_MAYOR30: currentProduct.PRECIO_CAJA_MAYOR30,
 
-      // Precios depósito (transferencia)
       PRECIO_UNIDAD_DEPOSITO: currentProduct.PRECIO_UNIDAD_DEPOSITO,
       PRECIO_PAR_DEPOSITO: currentProduct.PRECIO_PAR_DEPOSITO,
       PRECIO_MEDIADOCENA_DEPOSITO: currentProduct.PRECIO_MEDIADOCENA_DEPOSITO,
       PRECIO_DOCENA_DEPOSITO: currentProduct.PRECIO_DOCENA_DEPOSITO,
       PRECIO_CAJA_MAYOR30_DEPOSITO: currentProduct.PRECIO_CAJA_MAYOR30_DEPOSITO,
 
-      // Pre-cálculo (se volverá a calcular según método de pago real)
       PRECIO_UNITARIO: currentProduct.PRECIO_UNIDAD,
       PRECIO_APLICADO: precioPre,
       DESCUENTO_POR_CANTIDAD: 0,
@@ -664,17 +627,12 @@ export default function ChatBot() {
       );
 
       let newCarrito;
-      let newCantidad;
-      let newPricePre;
 
       if (existingIndex > -1) {
-        // Consolidar: sumar cantidad y recalcular subtotal
         newCarrito = [...prev.carrito];
         const existingItem = newCarrito[existingIndex];
-        newCantidad = existingItem.CANTIDAD + newItem.CANTIDAD;
-
-        // Recalcular precio basado en la nueva cantidad total
-        newPricePre = calcularPrecioPreview(currentProduct, newCantidad);
+        const newCantidad = existingItem.CANTIDAD + newItem.CANTIDAD;
+        const newPricePre = calcularPrecioPreview(currentProduct, newCantidad);
 
         newCarrito[existingIndex] = {
           ...existingItem,
@@ -683,13 +641,9 @@ export default function ChatBot() {
           SUBTOTAL_ITEM: newPricePre * newCantidad,
         };
       } else {
-        // Agregar nuevo item
         newCarrito = [...prev.carrito, newItem];
-        newCantidad = newItem.CANTIDAD;
-        newPricePre = newItem.PRECIO_APLICADO;
       }
 
-      // El mensaje de confirmación debe usar la cantidad y precio del item agregado/consolidado
       setToastMessage(
         `✅ Agregado: ${newItem.DESCRIPCION} (${newItem.TALLA}) x${newItem.CANTIDAD} = $${(
           newItem.PRECIO_APLICADO * newItem.CANTIDAD
@@ -699,7 +653,7 @@ export default function ChatBot() {
       return {
         ...prev,
         carrito: newCarrito,
-        step: "menu_flotante", // Nuevo paso para activar la barra flotante
+        step: "menu_flotante",
       };
     });
 
@@ -707,35 +661,30 @@ export default function ChatBot() {
     setCantidad(1);
   };
 
-  // ===================================
-  //            MOSTRAR CARRITO
-  // ===================================
   const mostrarCarrito = () => {
     if (sessionData.carrito.length === 0) {
       addMessage("🛒 Tu carrito está vacío", "bot");
-      setShowCarousel(false); // Ocultar catálogo si el carrito está vacío
+      setShowCarousel(false);
       return;
     }
 
-    setShowCarousel(false); // Ocultar catálogo para que el scroll funcione correctamente
+    setShowCarousel(false);
 
     let texto = "🛒 *TU CARRITO:*\n\n";
 
     let subtotal = 0;
     const metodo = sessionData.metodo_pago || "Contra entrega";
-    const incentivos = {}; // Para el punto 2.B
+    const incentivos = {};
 
     sessionData.carrito.forEach((item, idx) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
 
-      // 1.A Formato corto y claro por producto
       texto += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
       texto += `   Cantidad: ${item.CANTIDAD} → $${subItem.toFixed(2)}\n\n`;
 
       subtotal += subItem;
 
-      // 1.B Incentivo de cantidad (Agrupar por categoría + precio) - Lógica para incentivos
       const key = `${item.CATEGORIA}_${precio.toFixed(2)}`;
       if (!incentivos[key]) {
         incentivos[key] = {
@@ -748,7 +697,6 @@ export default function ChatBot() {
       incentivos[key].cantidad += item.CANTIDAD;
     });
 
-    // Lógica de incentivos (1.B) - Se muestran antes del subtotal final, agrupados por producto.
     Object.values(incentivos).forEach((group) => {
       const currentQty = group.cantidad;
       const item = group.item;
@@ -757,7 +705,6 @@ export default function ChatBot() {
       let targetName = "";
       let remaining = 0;
 
-      // Buscar el siguiente nivel de descuento
       if (currentQty === 1) {
         targetQty = 2;
         targetPrice = calcularPrecioItemConCantidad(item, metodo, 2);
@@ -780,7 +727,6 @@ export default function ChatBot() {
         remaining = 30 - currentQty;
       }
 
-      // Mostrar incentivo solo si el precio baja y cumple la condición de "faltan"
       if (targetQty > 0 && targetPrice < group.precio) {
         let mostrar = false;
         if (targetQty === 2 && remaining === 1) mostrar = true;
@@ -805,7 +751,6 @@ export default function ChatBot() {
     addMessage(texto, "bot");
   };
 
-  // Helper para calcular precio con una cantidad específica (necesario para el incentivo)
   const calcularPrecioItemConCantidad = (item, metodoPago, cant) => {
     const esTransferencia = metodoPago === "Transferencia";
 
@@ -834,9 +779,6 @@ export default function ChatBot() {
     return precioUnidad;
   };
 
-  // ===================================
-  //            MOSTRAR RESUMEN
-  // ===================================
   const mostrarResumen = () => {
     const metodo = sessionData.metodo_pago || "Contra entrega";
 
@@ -855,7 +797,6 @@ export default function ChatBot() {
     sessionData.carrito.forEach((item, idx) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
-      // Formato corto para el resumen (tipo carrito)
       resumen += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
       resumen += `   Cantidad: ${item.CANTIDAD} → $${subItem.toFixed(2)}\n\n`;
     });
@@ -864,7 +805,6 @@ export default function ChatBot() {
     resumen += `💵 costo_envio: $${sessionData.costo_envio.toFixed(2)}\n\n`;
     resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
 
-    // DETALLES DEL ENVÍO (Nuevo orden solicitado)
     resumen += `*DETALLES DEL ENVÍO:*\n\n`;
 
     let tipoEnvioTexto = sessionData.tipo_entrega;
@@ -914,9 +854,6 @@ export default function ChatBot() {
     ]);
   };
 
-  // ===================================
-  //     SUBIR COMPROBANTE DESPUÉS
-  // ===================================
   const subirComprobanteDespuesDeFactura = async (factura) => {
     if (!sessionData.foto_comprobante_base64) return;
     try {
@@ -937,9 +874,6 @@ export default function ChatBot() {
     }
   };
 
-  // ===================================
-  //      CREAR PEDIDO + COMPROBANTE
-  // ===================================
   const crearPedidoConComprobante = async () => {
     const metodo = sessionData.metodo_pago || "Contra entrega";
 
@@ -950,7 +884,6 @@ export default function ChatBot() {
 
     const total = subtotal + sessionData.costo_envio;
 
-    // Recalcular precios por producto para enviar limpios al backend
     const productos = sessionData.carrito.map((item) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
@@ -1012,9 +945,6 @@ export default function ChatBot() {
     }
   };
 
-  // ===================================
-  //         FILE → BASE64
-  // ===================================
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1054,9 +984,6 @@ export default function ChatBot() {
     }
   };
 
-  // ===================================
-  //             WHATSAPP
-  // ===================================
   const enviarWhatsApp = (subtotal, total) => {
     const metodo = sessionData.metodo_pago || "Contra entrega";
 
@@ -1068,7 +995,6 @@ export default function ChatBot() {
     sessionData.carrito.forEach((item, idx) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
-      // Formato detallado (mini-factura) para WhatsApp
       mensaje += `\nProducto #${idx + 1}\n`;
       mensaje += `Código interno: ${item.CODIGO_INTERNO}\n`;
       mensaje += `Categoría: ${item.CATEGORIA}\n`;
@@ -1090,7 +1016,6 @@ export default function ChatBot() {
     if (tipoTexto === "CASILLERO") tipoTexto = "📦 CASILLERO";
     if (tipoTexto === "RETIRO EN TIENDA") tipoTexto = "🏪 RETIRO EN TIENDA";
 
-    // DETALLES DEL ENVÍO (Nuevo orden solicitado)
     mensaje += `*DETALLES DEL ENVÍO:*\n`;
     mensaje += `🚚 envío: ${tipoTexto}\n`;
     mensaje += `📍 departamento: ${sessionData.departamento}\n`;
@@ -1124,19 +1049,14 @@ export default function ChatBot() {
     )}`;
 
     addMessage("Abriendo WhatsApp para confirmar tu pedido... 📱", "bot");
-    // Usar window.location.href para máxima compatibilidad en iOS/móviles
     window.location.href = url;
   };
 
-  // ===================================
-  //          PROCESAR MENSAJES
-  // ===================================
   const processMessage = async (userInput) => {
     addMessage(userInput, "user");
     const input = userInput.toLowerCase().trim();
     const session = sessionData;
 
-    // 1) NOMBRE
     if (session.step === "inicio") {
       const partes = userInput.trim().split(/\s+/);
       if (partes.length >= 2) {
@@ -1158,7 +1078,6 @@ export default function ChatBot() {
       return;
     }
 
-    // 2) TELÉFONO
     if (session.step === "telefono") {
       const tel = userInput.replace(/[^0-9]/g, "");
       if (tel.length >= 8) {
@@ -1180,12 +1099,11 @@ export default function ChatBot() {
       return;
     }
 
-    // 3) MENÚ PRINCIPAL
     if (input === "catalogo") {
       setShowCarousel(true);
       setCarouselIndex(0);
       cargarCatalogo(selectedCategory);
-      setSessionData((prev) => ({ ...prev, step: "menu_flotante" })); // Activar barra flotante
+      setSessionData((prev) => ({ ...prev, step: "menu_flotante" }));
       return;
     }
 
@@ -1201,18 +1119,16 @@ export default function ChatBot() {
 
     if (input === "agregar_mas") {
       setShowCarousel(true);
-      setSessionData((prev) => ({ ...prev, step: "menu_flotante" })); // Asegurar que el FAB esté visible
+      setSessionData((prev) => ({ ...prev, step: "menu_flotante" }));
       return;
     }
 
     if (input === "ver_carrito") {
       mostrarCarrito();
-      setSessionData((prev) => ({ ...prev, step: "menu_flotante" })); // Mantener barra flotante después de ver carrito
+      setSessionData((prev) => ({ ...prev, step: "menu_flotante" }));
       return;
     }
 
-    // CAMBIO 3: NUEVO FLUJO DE CONTINUAR PEDIDO CON ENVÍO INTELIGENTE
-    // 4) CONTINUAR PEDIDO - NUEVO FLUJO CON ENVÍO INTELIGENTE
     if (input === "continuar_pedido") {
       if (session.carrito.length === 0) {
         addMessage(
@@ -1238,11 +1154,9 @@ export default function ChatBot() {
       return;
     }
 
-    // 4.1) SELECCIONAR DEPARTAMENTO
     if (input.startsWith("dep_")) {
       const departamentoInput = input.replace("dep_", "");
       
-      // Buscar la clave correcta en el objeto (case-insensitive)
       const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
         (k) => k.toLowerCase() === departamentoInput.toLowerCase()
       );
@@ -1276,72 +1190,64 @@ export default function ChatBot() {
       return;
     }
 
-    // 4.2) SELECCIONAR MUNICIPIO
-if (input.startsWith("muni_")) {
-  const municipio = input.replace("muni_", "");
-  setMunicipioSeleccionado(municipio);
-  setSessionData((prev) => ({
-    ...prev,
-    municipio,
-    step: "seleccionar_tipo_envio_filtrado",
-  }));
+    if (input.startsWith("muni_")) {
+      const municipio = input.replace("muni_", "");
+      setMunicipioSeleccionado(municipio);
+      setSessionData((prev) => ({
+        ...prev,
+        municipio,
+        step: "seleccionar_tipo_envio_filtrado",
+      }));
 
-  // Calcular total de productos para filtrado
-  const totalProductos = session.carrito.reduce(
-    (sum, item) => sum + item.CANTIDAD,
-    0
-  );
+      const totalProductos = session.carrito.reduce(
+        (sum, item) => sum + item.CANTIDAD,
+        0
+      );
 
-  // Mostrar mensaje de carga
-  addMessage("🔍 Buscando opciones de envío disponibles...", "bot");
+      addMessage("🔍 Buscando opciones de envío disponibles...", "bot");
 
-  // Cargar encomiendistas para esta ubicación
-  const resultadoPuntoFijo = await cargarEncomiendistas(
-    "PUNTO FIJO",
-    departamentoSeleccionado,
-    municipio
-  );
-  const resultadoCasillero = await cargarEncomiendistas(
-    "CASILLERO",
-    departamentoSeleccionado,
-    municipio
-  );
+      const resultadoPuntoFijo = await cargarEncomiendistas(
+        "PUNTO FIJO",
+        departamentoSeleccionado,
+        municipio
+      );
+      const resultadoCasillero = await cargarEncomiendistas(
+        "CASILLERO",
+        departamentoSeleccionado,
+        municipio
+      );
 
-  console.log("🔍 DEBUG - Punto Fijo encontrados:", resultadoPuntoFijo.items.length);
-  console.log("🔍 DEBUG - Casilleros encontrados:", resultadoCasillero.items.length);
+      console.log("🔍 DEBUG - Punto Fijo encontrados:", resultadoPuntoFijo.items.length);
+      console.log("🔍 DEBUG - Casilleros encontrados:", resultadoCasillero.items.length);
 
-  // Construir opciones disponibles
-  const opciones = [];
-  opciones.push({
-    label: "🏪 RETIRO EN TIENDA ($0.00)",
-    value: "tipo_retiro_tienda",
-  });
-  opciones.push({
-    label: "🏠 PERSONALIZADO ($3.50)",
-    value: "tipo_personalizado",
-  });
+      const opciones = [];
+      opciones.push({
+        label: "🏪 RETIRO EN TIENDA ($0.00)",
+        value: "tipo_retiro_tienda",
+      });
+      opciones.push({
+        label: "🏠 PERSONALIZADO ($3.50)",
+        value: "tipo_personalizado",
+      });
 
-  // Punto Fijo: solo si tiene 1-2 productos Y existe para la ubicación
-  if (totalProductos <= 2 && resultadoPuntoFijo.items.length > 0) {
-    opciones.push({
-      label: "📍 PUNTO FIJO",
-      value: "tipo_punto_fijo",
-    });
-  }
+      if (totalProductos <= 2 && resultadoPuntoFijo.items.length > 0) {
+        opciones.push({
+          label: "📍 PUNTO FIJO",
+          value: "tipo_punto_fijo",
+        });
+      }
 
-  // Casillero: disponible siempre que exista para la ubicación
-  if (resultadoCasillero.items.length > 0) {
-    opciones.push({
-      label: "📦 CASILLERO",
-      value: "tipo_casillero",
-    });
-  }
+      if (resultadoCasillero.items.length > 0) {
+        opciones.push({
+          label: "📦 CASILLERO",
+          value: "tipo_casillero",
+        });
+      }
 
-  addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", opciones);
-  return;
-}
+      addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", opciones);
+      return;
+    }
 
-    // 4.3) VOLVER A TIPO DE ENVÍO (desde carrusel)
     if (input === "volver_tipo_envio") {
       setShowEncomiendaCarousel(false);
       setSessionData((prev) => ({
@@ -1393,7 +1299,6 @@ if (input.startsWith("muni_")) {
       return;
     }
 
-    // CAMBIO 7: TIPO PERSONALIZADO - Ya no pide departamento/municipio
     if (input === "tipo_personalizado") {
       setSessionData((prev) => ({
         ...prev,
@@ -1408,7 +1313,6 @@ if (input.startsWith("muni_")) {
       return;
     }
 
-    // Manejar punto de referencia personalizado
     if (session.step === "punto_referencia_personalizado") {
       setSessionData((prev) => ({
         ...prev,
@@ -1448,7 +1352,6 @@ if (input.startsWith("muni_")) {
       return;
     }
 
-    // CAMBIO 4: TIPO PUNTO FIJO con filtros
     if (input === "tipo_punto_fijo") {
       setSessionData((prev) => ({
         ...prev,
@@ -1481,7 +1384,6 @@ if (input.startsWith("muni_")) {
       return;
     }
 
-    // CAMBIO 8: TIPO RETIRO EN TIENDA
     if (input === "tipo_retiro_tienda") {
       setSessionData((prev) => ({
         ...prev,
@@ -1507,7 +1409,6 @@ if (input.startsWith("muni_")) {
       return;
     }
 
-    // CAMBIO 5: TIPO CASILLERO con filtros
     if (input === "tipo_casillero") {
       setSessionData((prev) => ({
         ...prev,
@@ -1540,7 +1441,6 @@ if (input.startsWith("muni_")) {
       return;
     }
 
-    // 7) MÉTODO DE PAGO
     if (input === "contra_entrega") {
       setSessionData((prev) => ({
         ...prev,
@@ -1578,7 +1478,6 @@ if (input.startsWith("muni_")) {
     }
 
     if (input === "subir_despues") {
-      // No hay comprobante todavía, pero dejamos continuar
       setSessionData((prev) => ({
         ...prev,
         step: "confirmar",
@@ -1591,7 +1490,6 @@ if (input.startsWith("muni_")) {
       return;
     }
 
-    // 8) CONFIRMAR / CANCELAR
     if (input === "confirmar_pedido") {
       await crearPedidoConComprobante();
       return;
@@ -1605,13 +1503,9 @@ if (input.startsWith("muni_")) {
       return;
     }
 
-    // Default
     addMessage("No entendí esa opción 😅 Usa los botones disponibles.", "bot");
   };
 
-  // ===================================
-  //      HANDLERS DE INPUT / BOTONES
-  // ===================================
   const handleSend = () => {
     if (!input.trim()) return;
     processMessage(input);
@@ -1638,28 +1532,30 @@ if (input.startsWith("muni_")) {
   const currentProduct = filtered[carouselIndex];
 
   // ===================================
-  //               UI
+  //         UI RESPONSIVA
   // ===================================
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 to-purple-50">
-      <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-4 shadow-lg">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 to-purple-50 overflow-hidden">
+      {/* HEADER RESPONSIVO */}
+      <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-3 sm:p-4 shadow-lg">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <ShoppingBag className="w-8 h-8" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ShoppingBag className="w-6 h-6 sm:w-8 sm:h-8" />
             <div>
-              <h1 className="text-xl font-bold">GyS Importadora</h1>
-              <p className="text-sm opacity-90">Ropa y accesorios 💚</p>
+              <h1 className="text-lg sm:text-xl font-bold">GyS Importadora</h1>
+              <p className="text-xs sm:text-sm opacity-90">Ropa y accesorios 💚</p>
             </div>
           </div>
           {sessionData.carrito.length > 0 && (
-            <div className="bg-white/20 px-3 py-1 rounded-full text-sm">
+            <div className="bg-white/20 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm">
               🛒 {sessionData.carrito.length}
             </div>
           )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-4xl mx-auto w-full pb-20">
+      {/* MENSAJES RESPONSIVOS */}
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto w-full pb-24 sm:pb-28">
         {messages.map((msg, idx) => (
           <div
             key={idx}
@@ -1668,17 +1564,17 @@ if (input.startsWith("muni_")) {
             }`}
           >
             <div
-              className={`max-w-[80%] ${
+              className={`max-w-[85%] sm:max-w-[80%] ${
                 msg.sender === "user"
                   ? "bg-purple-500 text-white"
                   : "bg-white text-gray-800"
-              } rounded-2xl px-4 py-3 shadow-md`}
+              } rounded-2xl px-3 sm:px-4 py-2 sm:py-3 shadow-md`}
             >
-              <p className="whitespace-pre-wrap">{msg.text}</p>
+              <p className="whitespace-pre-wrap text-sm sm:text-base">{msg.text}</p>
               {msg.options && (
                 <div
-                  className={`mt-3 ${
-                    msg.options.length > 6 ? "max-h-96 overflow-y-auto" : ""
+                  className={`mt-2 sm:mt-3 ${
+                    msg.options.length > 6 ? "max-h-80 sm:max-h-96 overflow-y-auto" : ""
                   }`}
                 >
                   <div
@@ -1690,7 +1586,7 @@ if (input.startsWith("muni_")) {
                       <button
                         key={i}
                         onClick={() => handleOptionClick(opt.value)}
-                        className="w-full bg-gradient-to-r from-pink-400 to-purple-500 text-white px-4 py-2 rounded-lg hover:from-pink-500 hover:to-purple-600 transition-all text-sm font-medium text-left"
+                        className="w-full bg-gradient-to-r from-pink-400 to-purple-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:from-pink-500 hover:to-purple-600 transition-all text-xs sm:text-sm font-medium text-left"
                       >
                         {opt.label}
                       </button>
@@ -1702,20 +1598,20 @@ if (input.startsWith("muni_")) {
           </div>
         ))}
 
-        {/* COMPONENTE TOAST (Notificación Temporal) */}
+        {/* TOAST RESPONSIVO */}
         {toastMessage && (
-          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 w-full max-w-md">
             <div
-              className={`bg-white text-gray-800 rounded-xl shadow-2xl p-3 flex items-center gap-2 border ${
+              className={`bg-white text-gray-800 rounded-xl shadow-2xl p-2 sm:p-3 flex items-center gap-2 border ${
                 toastMessage.includes("⚠️")
                   ? "border-yellow-500"
                   : "border-green-500"
               }`}
             >
-              <span className="text-lg">
+              <span className="text-base sm:text-lg">
                 {toastMessage.includes("⚠️") ? "⚠️" : "✅"}
               </span>
-              <span className="font-medium">
+              <span className="font-medium text-xs sm:text-sm">
                 {toastMessage.replace(/⚠️|✅/g, "").trim()}
               </span>
             </div>
@@ -1724,17 +1620,18 @@ if (input.startsWith("muni_")) {
 
         {loadingEncomiendas && (
           <div className="flex justify-center items-center">
-            <div className="bg-white rounded-xl shadow-lg p-6 flex items-center gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
-              <span className="text-gray-700">Buscando opciones...</span>
+            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 flex items-center gap-3">
+              <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-purple-500" />
+              <span className="text-gray-700 text-sm sm:text-base">Buscando opciones...</span>
             </div>
           </div>
         )}
 
+        {/* CATÁLOGO RESPONSIVO */}
         {showCarousel && (
-          <div className="bg-white rounded-xl shadow-lg p-4 mx-auto max-w-md">
+          <div className="bg-white rounded-xl shadow-lg p-3 sm:p-4 mx-auto max-w-md">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="font-bold text-lg">🛍️ Catálogo</h3>
+              <h3 className="font-bold text-base sm:text-lg">🛍️ Catálogo</h3>
               <select
                 value={selectedCategory}
                 onChange={(e) => {
@@ -1742,7 +1639,7 @@ if (input.startsWith("muni_")) {
                   setCarouselIndex(0);
                   cargarCatalogo(e.target.value);
                 }}
-                className="px-3 py-1 border rounded-lg text-sm"
+                className="px-2 sm:px-3 py-1 border rounded-lg text-xs sm:text-sm"
               >
                 <option value="todos">Todos</option>
                 {categoriasDinamicas.map((cat, i) => (
@@ -1754,8 +1651,8 @@ if (input.startsWith("muni_")) {
             </div>
 
             {loadingCatalog ? (
-              <div className="flex justify-center items-center h-64">
-                <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+              <div className="flex justify-center items-center h-48 sm:h-64">
+                <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-purple-500" />
               </div>
             ) : currentProduct ? (
               <div className="relative">
@@ -1774,22 +1671,22 @@ if (input.startsWith("muni_")) {
                     return url;
                   })()}
                   alt={currentProduct.DESCRIPCION}
-                  className="w-full h-64 object-cover rounded-lg mb-3"
+                  className="w-full h-48 sm:h-64 object-cover rounded-lg mb-3"
                   onError={(e) => {
                     e.target.src =
                       "https://via.placeholder.com/300?text=Sin+Imagen";
                   }}
                 />
 
-                <div className="space-y-3">
-                  <h4 className="font-semibold text-lg capitalize">
+                <div className="space-y-2 sm:space-y-3">
+                  <h4 className="font-semibold text-base sm:text-lg capitalize">
                     {currentProduct.DESCRIPCION}
                   </h4>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs sm:text-sm">
                     <span className="text-gray-600">
                       Color: {currentProduct.COLOR}
                     </span>
-                    <span className="font-bold text-purple-600 text-lg">
+                    <span className="font-bold text-purple-600 text-base sm:text-lg">
                       ${currentProduct.PRECIO_UNIDAD}
                     </span>
                   </div>
@@ -1797,13 +1694,13 @@ if (input.startsWith("muni_")) {
                   {currentProduct.TALLAS_DISPONIBLES &&
                     currentProduct.TALLAS_DISPONIBLES.length > 0 && (
                       <div>
-                        <label className="block text-sm font-medium mb-2">
+                        <label className="block text-xs sm:text-sm font-medium mb-2">
                           Talla:
                         </label>
                         <select
                           value={selectedTalla}
                           onChange={(e) => setSelectedTalla(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg"
+                          className="w-full px-2 sm:px-3 py-2 border rounded-lg text-xs sm:text-sm"
                         >
                           <option value="">Selecciona talla</option>
                           {currentProduct.TALLAS_DISPONIBLES.map((t, i) => (
@@ -1816,7 +1713,7 @@ if (input.startsWith("muni_")) {
                     )}
 
                   <div>
-                    <label className="block text-sm font-medium mb-2">
+                    <label className="block text-xs sm:text-sm font-medium mb-2">
                       Cantidad:
                     </label>
                     <input
@@ -1827,48 +1724,49 @@ if (input.startsWith("muni_")) {
                         const val = e.target.value;
                         setCantidad(val === "" ? "" : parseInt(val) || 1);
                       }}
-                      className="w-full px-3 py-2 border rounded-lg"
+                      className="w-full px-2 sm:px-3 py-2 border rounded-lg text-xs sm:text-sm"
                     />
                   </div>
 
                   <button
                     onClick={agregarAlCarrito}
-                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
+                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-2 sm:py-3 rounded-lg text-sm sm:text-base font-semibold hover:from-pink-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
                   >
-                    <Package className="w-5 h-5" />
+                    <Package className="w-4 h-4 sm:w-5 sm:h-5" />
                     Agregar al carrito
                   </button>
                 </div>
 
                 <button
                   onClick={() => handleCarouselNav("prev")}
-                  className="absolute left-2 top-28 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                  className="absolute left-1 sm:left-2 top-20 sm:top-28 bg-white/80 p-1.5 sm:p-2 rounded-full shadow-lg hover:bg-white"
                 >
-                  <ChevronLeft className="w-6 h-6" />
+                  <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
                 <button
                   onClick={() => handleCarouselNav("next")}
-                  className="absolute right-2 top-28 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                  className="absolute right-1 sm:right-2 top-20 sm:top-28 bg-white/80 p-1.5 sm:p-2 rounded-full shadow-lg hover:bg-white"
                 >
-                  <ChevronRight className="w-6 h-6" />
+                  <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
 
-                <div className="text-center text-sm text-gray-500 mt-2">
+                <div className="text-center text-xs sm:text-sm text-gray-500 mt-2">
                   {carouselIndex + 1} / {filtered.length}
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 text-sm">
                 No hay productos disponibles
               </div>
             )}
           </div>
         )}
 
+        {/* CARRUSEL ENCOMIENDAS RESPONSIVO */}
         {showEncomiendaCarousel && encomiendistas.length > 0 && (
-          <div className="bg-white rounded-xl shadow-lg p-4 mx-auto max-w-md">
+          <div className="bg-white rounded-xl shadow-lg p-3 sm:p-4 mx-auto max-w-md">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="font-bold text-lg">
+              <h3 className="font-bold text-base sm:text-lg">
                 {sessionData.tipo_entrega === "PUNTO FIJO"
                   ? "📍 Puntos Fijos"
                   : "📦 Casilleros"}
@@ -1892,7 +1790,7 @@ if (input.startsWith("muni_")) {
                     <img
                       src={fotoUrl}
                       alt={enc.ENCOMIENDISTA}
-                      className="w-full h-48 object-cover rounded-lg mb-3"
+                      className="w-full h-40 sm:h-48 object-cover rounded-lg mb-3"
                       onError={(e) => {
                         e.target.src =
                           "https://via.placeholder.com/300?text=Sin+Foto";
@@ -1900,38 +1798,38 @@ if (input.startsWith("muni_")) {
                     />
                   )}
 
-                  <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-bold text-xl text-purple-600">
+                  <div className="space-y-2 sm:space-y-3 bg-gray-50 p-3 sm:p-4 rounded-lg">
+                    <h4 className="font-bold text-lg sm:text-xl text-purple-600">
                       {enc.ENCOMIENDISTA}
                     </h4>
 
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
                       <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-gray-500" />
+                        <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
                         <span className="font-semibold">
                           {enc.DEPARTAMENTO} - {enc.MUNICIPIO}
                         </span>
                       </div>
                       {enc.PUNTO_REFERENCIA && (
                         <div className="flex items-start gap-2">
-                          <Package className="w-4 h-4 text-gray-500 mt-0.5" />
+                          <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 mt-0.5" />
                           <span>{enc.PUNTO_REFERENCIA}</span>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-green-600" />
-                        <span className="font-bold text-green-600 text-lg">
+                        <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600" />
+                        <span className="font-bold text-green-600 text-base sm:text-lg">
                           ${enc.COSTO_ENVIO}
                         </span>
                       </div>
                       {enc.DIA_ENTREGA && (
                         <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-gray-500" />
+                          <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
                           <span>{enc.DIA_ENTREGA}</span>
                         </div>
                       )}
                       {enc.HORA_ENTREGA && (
-                        <div className="flex items-center gap-2 ml-6">
+                        <div className="flex items-center gap-2 ml-5 sm:ml-6">
                           <span className="text-gray-600">
                             ⏰ {enc.HORA_ENTREGA}
                           </span>
@@ -1941,16 +1839,15 @@ if (input.startsWith("muni_")) {
 
                     <button
                       onClick={seleccionarEncomienda}
-                      className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 mt-4"
+                      className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-2 sm:py-3 rounded-lg text-sm sm:text-base font-semibold hover:from-pink-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 mt-3 sm:mt-4"
                     >
-                      <Truck className="w-5 h-5" />
+                      <Truck className="w-4 h-4 sm:w-5 sm:h-5" />
                       Elegir esta opción
                     </button>
 
-                    {/* CAMBIO 6: Botón de retroceso */}
                     <button
                       onClick={() => handleOptionClick("volver_tipo_envio")}
-                      className="w-full bg-gray-300 text-gray-800 py-2 rounded-lg font-semibold hover:bg-gray-400 transition-all"
+                      className="w-full bg-gray-300 text-gray-800 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-gray-400 transition-all"
                     >
                       ⬅️ Cambiar tipo de envío
                     </button>
@@ -1958,18 +1855,18 @@ if (input.startsWith("muni_")) {
 
                   <button
                     onClick={() => handleEncomiendaNav("prev")}
-                    className="absolute left-2 top-20 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                    className="absolute left-1 sm:left-2 top-16 sm:top-20 bg-white/80 p-1.5 sm:p-2 rounded-full shadow-lg hover:bg-white"
                   >
-                    <ChevronLeft className="w-6 h-6" />
+                    <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
                   </button>
                   <button
                     onClick={() => handleEncomiendaNav("next")}
-                    className="absolute right-2 top-20 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white"
+                    className="absolute right-1 sm:right-2 top-16 sm:top-20 bg-white/80 p-1.5 sm:p-2 rounded-full shadow-lg hover:bg-white"
                   >
-                    <ChevronRight className="w-6 h-6" />
+                    <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
                   </button>
 
-                  <div className="text-center text-sm text-gray-500 mt-2">
+                  <div className="text-center text-xs sm:text-sm text-gray-500 mt-2">
                     Opción {encomiendaIndex + 1} de {encomiendistas.length}
                   </div>
                 </div>
@@ -1981,26 +1878,26 @@ if (input.startsWith("muni_")) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* BARRA DE ACCIONES FLOTANTE (FAB) */}
+      {/* BARRA FLOTANTE RESPONSIVA */}
       {(sessionData.step === "menu_flotante" || sessionData.step === "menu") && (
-        <div className="fixed bottom-20 left-0 right-0 z-10">
-          <div className="max-w-4xl mx-auto px-4">
-            <div className="bg-white p-3 rounded-xl shadow-2xl flex justify-around gap-2 border border-purple-200">
+        <div className="fixed bottom-16 sm:bottom-20 left-0 right-0 z-10">
+          <div className="max-w-4xl mx-auto px-3 sm:px-4">
+            <div className="bg-white p-2 sm:p-3 rounded-xl shadow-2xl flex justify-around gap-1.5 sm:gap-2 border border-purple-200">
               <button
                 onClick={() => handleOptionClick("agregar_mas")}
-                className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:from-pink-600 hover:to-purple-700 transition-all"
+                className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:from-pink-600 hover:to-purple-700 transition-all"
               >
-                ➕ Agregar más
+                ➕ Agregar
               </button>
               <button
                 onClick={() => handleOptionClick("ver_carrito")}
-                className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-purple-600 transition-all"
+                className="flex-1 bg-purple-500 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-purple-600 transition-all"
               >
-                🛒 Ver Carrito
+                🛒 Carrito
               </button>
               <button
                 onClick={() => handleOptionClick("continuar_pedido")}
-                className="flex-1 bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-green-600 transition-all"
+                className="flex-1 bg-green-500 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-green-600 transition-all"
               >
                 ✅ Continuar
               </button>
@@ -2009,20 +1906,18 @@ if (input.startsWith("muni_")) {
         </div>
       )}
 
-      {/* FOOTER INPUT */}
-      <div className="bg-white border-t p-4 shadow-lg">
-        <div className="max-w-4xl mx-auto flex gap-2 items-center">
-          {/* Input de texto */}
+      {/* FOOTER RESPONSIVO */}
+      <div className="bg-white border-t p-3 sm:p-4 shadow-lg">
+        <div className="max-w-4xl mx-auto flex gap-1.5 sm:gap-2 items-center">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Escribe tu mensaje..."
-            className="flex-1 px-4 py-3 border-2 border-purple-200 rounded-full focus:outline-none focus:border-purple-500"
+            className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border-2 border-purple-200 rounded-full focus:outline-none focus:border-purple-500 text-xs sm:text-base"
           />
 
-          {/* Input de archivo oculto */}
           <input
             id="fileInput"
             type="file"
@@ -2031,20 +1926,18 @@ if (input.startsWith("muni_")) {
             onChange={(e) => handleFileUpload(e.target.files[0])}
           />
 
-          {/* Botón cámara */}
           <label
             htmlFor="fileInput"
-            className="bg-purple-500 text-white p-3 rounded-full cursor-pointer hover:bg-purple-600 transition-all"
+            className="bg-purple-500 text-white p-2 sm:p-3 rounded-full cursor-pointer hover:bg-purple-600 transition-all text-sm sm:text-base"
           >
             📷
           </label>
 
-          {/* Botón enviar */}
           <button
             onClick={handleSend}
-            className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-3 rounded-full hover:from-pink-600 hover:to-purple-700 transition-all"
+            className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-2 sm:p-3 rounded-full hover:from-pink-600 hover:to-purple-700 transition-all"
           >
-            <Send className="w-6 h-6" />
+            <Send className="w-4 h-4 sm:w-6 sm:h-6" />
           </button>
         </div>
       </div>
