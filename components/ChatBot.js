@@ -1185,7 +1185,21 @@ export default function ChatBot( ) {
     // 2.1) DEPARTAMENTO
     if (input.startsWith("dep_")) {
       const departamento = input.replace("dep_", "");
-      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
+      
+      // Buscar la clave correcta en el objeto (puede tener espacios o caracteres especiales)
+      const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
+        key => key.toLowerCase() === departamento.toLowerCase()
+      );
+      
+      if (!departamentoKey) {
+        addMessage(
+          `⚠️ No se encontraron municipios para ${departamento}.`,
+          "bot"
+        );
+        return;
+      }
+      
+      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamentoKey] || [];
 
       if (!municipios.length) {
         addMessage(
@@ -1197,7 +1211,7 @@ export default function ChatBot( ) {
 
       setSessionData((prev) => ({
         ...prev,
-        departamento,
+        departamento: departamentoKey,
         step: "municipio",
       }));
 
