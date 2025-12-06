@@ -409,7 +409,7 @@ export default function ChatBot( ) {
         setCatalogo(items);
 
         // Extraer categorías únicas y dinámicas
-        if (items.length > 0) {
+        if (items.length > 0 && categoriasDinamicas.length === 0) {
           const categorias = [
             ...new Set(
               items.map((item) => item.CATEGORIA).filter(Boolean)
