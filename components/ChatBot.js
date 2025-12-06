@@ -1319,12 +1319,7 @@ export default function ChatBot( ) {
         step: "metodo_pago",
       }));
       addMessage(
-        "✅ Has seleccionado *RETIRO EN TIENDA*.
-
-🏪 Ubicación: [Tu tienda física]
-⏰ Horario: [Horario de tienda]
-
-¿Cómo deseas pagar?",
+        "✅ Has seleccionado *RETIRO EN TIENDA*.\n\n🏪 Ubicación: [Tu tienda física]\n⏰ Horario: [Horario de tienda]\n\n¿Cómo deseas pagar?",
         "bot",
         [
           { label: "💵 Contra entrega", value: "contra_entrega" },
