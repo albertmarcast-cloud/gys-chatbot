@@ -1240,7 +1240,13 @@ export default function ChatBot() {
 
     // 4.1) SELECCIONAR DEPARTAMENTO
     if (input.startsWith("dep_")) {
-      const departamento = input.replace("dep_", "");
+      const departamentoInput = input.replace("dep_", "");
+      
+      // Buscar la clave correcta en el objeto (case-insensitive)
+      const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
+        (k) => k.toLowerCase() === departamentoInput.toLowerCase()
+      );
+      const departamento = departamentoKey || departamentoInput;
       const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
 
       if (!municipios.length) {
