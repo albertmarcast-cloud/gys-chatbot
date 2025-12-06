@@ -315,7 +315,7 @@ const DEPARTAMENTOS_MUNICIPIOS = {
 // ======================
 //  COMPONENTE PRINCIPAL
 // ======================
-export default function ChatBot() {
+export default function ChatBot( ) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [catalogo, setCatalogo] = useState([]);
@@ -352,7 +352,7 @@ export default function ChatBot() {
   const [categoriasDinamicas, setCategoriasDinamicas] = useState([]);
   const [selectedTalla, setSelectedTalla] = useState("");
   const [cantidad, setCantidad] = useState(1);
-  const [toastMessage, setToastMessage] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null); // Nuevo estado para el Toast
 
   // NUEVOS ESTADOS PARA ENVÍO INTELIGENTE
   const [departamentoSeleccionado, setDepartamentoSeleccionado] = useState("");
@@ -368,6 +368,7 @@ export default function ChatBot() {
     scrollToBottom();
   }, [messages]);
 
+  // Lógica para ocultar el Toast después de 3 segundos
   useEffect(() => {
     if (toastMessage) {
       const timer = setTimeout(() => {
@@ -407,11 +408,11 @@ export default function ChatBot() {
       if (data.error) {
         addMessage("❌ Error al cargar el catálogo. Intenta de nuevo.", "bot");
         setCatalogo([]);
-        setCategoriasDinamicas([]);
       } else {
         const items = data.items || [];
         setCatalogo(items);
 
+        // Extraer categorías únicas y dinámicas
         if (items.length > 0 && categoriasDinamicas.length === 0) {
           const categorias = [
             ...new Set(
@@ -510,6 +511,7 @@ export default function ChatBot() {
     const tipoTexto =
       sessionData.tipo_entrega === "PUNTO FIJO" ? "punto fijo" : "casillero";
 
+    // --- INCENTIVO TRANSFERENCIA (3) ---
     const costoEnvio = enc.COSTO_ENVIO;
     const totalContraEntrega = calcularTotalCarrito(
       "Contra entrega",
@@ -527,6 +529,7 @@ export default function ChatBot() {
         2
       )}. ¡Aprovecha el mejor precio!`;
     }
+    // -----------------------------------
 
     addMessage(
       `✅ Seleccionaste ${tipoTexto}: ${enc.ENCOMIENDISTA}\n📍 ${enc.DEPARTAMENTO} - ${enc.MUNICIPIO}\n🏪 ${enc.PUNTO_REFERENCIA}\n💵 Costo: $${enc.COSTO_ENVIO}\n\n¿Cómo deseas pagar?${incentivoTexto}`,
@@ -595,8 +598,216 @@ export default function ChatBot() {
   };
 
   // ===================================
-  //   PRECIO POR ITEM CON CANTIDAD ESPECÍFICA
+  //     CALCULAR TOTAL DEL CARRITO
   // ===================================
+  const calcularTotalCarrito = (metodoPago, carrito, costoEnvio) => {
+    const subtotal = carrito.reduce((sum, item) => {
+      const precio = calcularPrecioItem(item, metodoPago);
+      return sum + precio * item.CANTIDAD;
+    }, 0);
+    return subtotal + costoEnvio;
+  };
+
+  // ===================================
+  //     AGREGAR PRODUCTO AL CARRITO
+  // ===================================
+  const agregarAlCarrito = () => {
+    const filtered = getFilteredCatalog();
+    const currentProduct = filtered[carouselIndex];
+    if (!currentProduct) return;
+
+    if (!selectedTalla && currentProduct.TALLAS_DISPONIBLES?.length > 0) {
+      setToastMessage("⚠️ Por favor selecciona una talla");
+      return;
+    }
+
+    // Precio preliminar solo para mostrar (se recalcula luego según método de pago)
+    const precioPre = calcularPrecioPreview(currentProduct, cantidad);
+
+    const newItem = {
+      CODIGO_INTERNO: currentProduct.CODIGO_INTERNO,
+      CODIGO: currentProduct.CODIGO,
+      CATEGORIA: currentProduct.CATEGORIA,
+      DESCRIPCION: currentProduct.DESCRIPCION,
+      TALLA: selectedTalla || currentProduct.TALLA_SIMPLE || "N/A",
+      COLOR: currentProduct.COLOR,
+      CANTIDAD: cantidad,
+
+      // Precios normales
+      PRECIO_UNIDAD: currentProduct.PRECIO_UNIDAD,
+      PRECIO_PAR: currentProduct.PRECIO_PAR,
+      PRECIO_MEDIADOCENA: currentProduct.PRECIO_MEDIADOCENA,
+      PRECIO_DOCENA: currentProduct.PRECIO_DOCENA,
+      PRECIO_CAJA_MAYOR30: currentProduct.PRECIO_CAJA_MAYOR30,
+
+      // Precios depósito (transferencia)
+      PRECIO_UNIDAD_DEPOSITO: currentProduct.PRECIO_UNIDAD_DEPOSITO,
+      PRECIO_PAR_DEPOSITO: currentProduct.PRECIO_PAR_DEPOSITO,
+      PRECIO_MEDIADOCENA_DEPOSITO: currentProduct.PRECIO_MEDIADOCENA_DEPOSITO,
+      PRECIO_DOCENA_DEPOSITO: currentProduct.PRECIO_DOCENA_DEPOSITO,
+      PRECIO_CAJA_MAYOR30_DEPOSITO: currentProduct.PRECIO_CAJA_MAYOR30_DEPOSITO,
+
+      // Pre-cálculo (se volverá a calcular según método de pago real)
+      PRECIO_UNITARIO: currentProduct.PRECIO_UNIDAD,
+      PRECIO_APLICADO: precioPre,
+      DESCUENTO_POR_CANTIDAD: 0,
+      SUBTOTAL_ITEM: precioPre * cantidad,
+      FOTO: currentProduct.FOTO || "",
+    };
+
+    setSessionData((prev) => {
+      const existingIndex = prev.carrito.findIndex(
+        (cartItem) =>
+          cartItem.CODIGO_INTERNO === newItem.CODIGO_INTERNO &&
+          cartItem.TALLA === newItem.TALLA
+      );
+
+      let newCarrito;
+      let newCantidad;
+      let newPricePre;
+
+      if (existingIndex > -1) {
+        // Consolidar: sumar cantidad y recalcular subtotal
+        newCarrito = [...prev.carrito];
+        const existingItem = newCarrito[existingIndex];
+        newCantidad = existingItem.CANTIDAD + newItem.CANTIDAD;
+
+        // Recalcular precio basado en la nueva cantidad total
+        newPricePre = calcularPrecioPreview(currentProduct, newCantidad);
+
+        newCarrito[existingIndex] = {
+          ...existingItem,
+          CANTIDAD: newCantidad,
+          PRECIO_APLICADO: newPricePre,
+          SUBTOTAL_ITEM: newPricePre * newCantidad,
+        };
+      } else {
+        // Agregar nuevo item
+        newCarrito = [...prev.carrito, newItem];
+        newCantidad = newItem.CANTIDAD;
+        newPricePre = newItem.PRECIO_APLICADO;
+      }
+
+      // El mensaje de confirmación debe usar la cantidad y precio del item agregado/consolidado
+      setToastMessage(
+        `✅ Agregado: ${newItem.DESCRIPCION} (${newItem.TALLA}) x${newItem.CANTIDAD} = $${(
+          newItem.PRECIO_APLICADO * newItem.CANTIDAD
+        ).toFixed(2)}`
+      );
+
+      return {
+        ...prev,
+        carrito: newCarrito,
+        step: "menu_flotante", // Nuevo paso para activar la barra flotante
+      };
+    });
+
+    // Los botones de acción se manejarán con la barra flotante
+    // addMessage("¿Qué deseas hacer?", "bot"); // Mensaje simple para indicar que se esperan acciones (ya no es necesario)
+
+    setSelectedTalla("");
+    setCantidad(1);
+  };
+
+  // ===================================
+  //            MOSTRAR CARRITO
+  // ===================================
+  const mostrarCarrito = () => {
+    if (sessionData.carrito.length === 0) {
+      addMessage("🛒 Tu carrito está vacío", "bot");
+      setShowCarousel(false); // Ocultar catálogo si el carrito está vacío
+      return;
+    }
+
+    setShowCarousel(false); // Ocultar catálogo para que el scroll funcione correctamente
+
+    let texto = "🛒 *TU CARRITO:*\n\n";
+
+    let subtotal = 0;
+    const metodo = sessionData.metodo_pago || "Contra entrega";
+    const incentivos = {}; // Para el punto 2.B
+
+    sessionData.carrito.forEach((item, idx) => {
+      const precio = calcularPrecioItem(item, metodo);
+      const subItem = precio * item.CANTIDAD;
+
+      // 1.A Formato corto y claro por producto
+      texto += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
+      texto += `   Cantidad: ${item.CANTIDAD} → $${subItem.toFixed(2)}\n\n`;
+
+      subtotal += subItem;
+
+      // 1.B Incentivo de cantidad (Agrupar por categoría + precio) - Lógica para incentivos
+      const key = `${item.CATEGORIA}_${precio.toFixed(2)}`;
+      if (!incentivos[key]) {
+        incentivos[key] = {
+          categoria: item.CATEGORIA,
+          precio: precio,
+          cantidad: 0,
+          item: item,
+        };
+      }
+      incentivos[key].cantidad += item.CANTIDAD;
+    });
+
+    // Lógica de incentivos (1.B) - Se muestran antes del subtotal final, agrupados por producto.
+    Object.values(incentivos).forEach((group) => {
+      const currentQty = group.cantidad;
+      const item = group.item;
+      let targetQty = 0;
+      let targetPrice = 0;
+      let targetName = "";
+      let remaining = 0;
+
+      // Buscar el siguiente nivel de descuento
+      if (currentQty === 1) {
+        targetQty = 2;
+        targetPrice = calcularPrecioItemConCantidad(item, metodo, 2);
+        targetName = "par";
+        remaining = 1;
+      } else if (currentQty >= 4 && currentQty <= 5) {
+        targetQty = 6;
+        targetPrice = calcularPrecioItemConCantidad(item, metodo, 6);
+        targetName = "media docena";
+        remaining = 6 - currentQty;
+      } else if (currentQty >= 10 && currentQty <= 11) {
+        targetQty = 12;
+        targetPrice = calcularPrecioItemConCantidad(item, metodo, 12);
+        targetName = "docena";
+        remaining = 12 - currentQty;
+      } else if (currentQty >= 20 && currentQty <= 29) {
+        targetQty = 30;
+        targetPrice = calcularPrecioItemConCantidad(item, metodo, 30);
+        targetName = "caja";
+        remaining = 30 - currentQty;
+      }
+
+      // Mostrar incentivo solo si el precio baja y cumple la condición de "faltan"
+      if (targetQty > 0 && targetPrice < group.precio) {
+        let mostrar = false;
+        if (targetQty === 2 && remaining === 1) mostrar = true;
+        if (targetQty === 6 && (remaining === 1 || remaining === 2))
+          mostrar = true;
+        if (targetQty === 12 && (remaining === 1 || remaining === 2))
+          mostrar = true;
+        if (targetQty === 30 && remaining <= 10) mostrar = true;
+
+        if (mostrar) {
+          texto += `💡 *¡Aprovecha en ${group.categoria}!*`;
+          texto += `\nSolo ${remaining} piezas más para llegar a ${targetName}.`;
+          texto += `\n¡El precio bajará automáticamente a $${targetPrice.toFixed(
+            2
+          )} c/u! 🔥\n\n`;
+        }
+      }
+    });
+
+    texto += `💰 *SUBTOTAL: $${subtotal.toFixed(2)}*`;
+
+    addMessage(texto, "bot");
+  };
+
+  // Helper para calcular precio con una cantidad específica (necesario para el incentivo)
   const calcularPrecioItemConCantidad = (item, metodoPago, cant) => {
     const esTransferencia = metodoPago === "Transferencia";
 
@@ -626,132 +837,6 @@ export default function ChatBot() {
   };
 
   // ===================================
-  //     CALCULAR TOTAL DEL CARRITO
-  // ===================================
-  const calcularTotalCarrito = (metodoPago, carrito, costoEnvio) => {
-    const subtotal = carrito.reduce((sum, item) => {
-      const precio = calcularPrecioItem(item, metodoPago);
-      return sum + precio * item.CANTIDAD;
-    }, 0);
-    return subtotal + costoEnvio;
-  };
-
-  // ===================================
-  //     AGREGAR PRODUCTO AL CARRITO
-  // ===================================
-  const agregarAlCarrito = () => {
-    const filtered = getFilteredCatalog();
-    const currentProduct = filtered[carouselIndex];
-    if (!currentProduct) return;
-
-    if (!selectedTalla && currentProduct.TALLAS_DISPONIBLES?.length > 0) {
-      setToastMessage("⚠️ Por favor selecciona una talla");
-      return;
-    }
-
-    const precioPre = calcularPrecioPreview(currentProduct, cantidad);
-
-    const newItem = {
-      CODIGO_INTERNO: currentProduct.CODIGO_INTERNO || "",
-      CODIGO: currentProduct.CODIGO || "",
-      CATEGORIA: currentProduct.CATEGORIA || "",
-      DESCRIPCION: currentProduct.DESCRIPCION || "",
-      TALLA: selectedTalla || currentProduct.TALLA_SIMPLE || "N/A",
-      COLOR: currentProduct.COLOR || "",
-      CANTIDAD: cantidad,
-
-      PRECIO_UNIDAD: currentProduct.PRECIO_UNIDAD,
-      PRECIO_PAR: currentProduct.PRECIO_PAR,
-      PRECIO_MEDIADOCENA: currentProduct.PRECIO_MEDIADOCENA,
-      PRECIO_DOCENA: currentProduct.PRECIO_DOCENA,
-      PRECIO_CAJA_MAYOR30: currentProduct.PRECIO_CAJA_MAYOR30,
-
-      PRECIO_UNIDAD_DEPOSITO: currentProduct.PRECIO_UNIDAD_DEPOSITO,
-      PRECIO_PAR_DEPOSITO: currentProduct.PRECIO_PAR_DEPOSITO,
-      PRECIO_MEDIADOCENA_DEPOSITO: currentProduct.PRECIO_MEDIADOCENA_DEPOSITO,
-      PRECIO_DOCENA_DEPOSITO: currentProduct.PRECIO_DOCENA_DEPOSITO,
-      PRECIO_CAJA_MAYOR30_DEPOSITO: currentProduct.PRECIO_CAJA_MAYOR30_DEPOSITO,
-
-      PRECIO_UNITARIO: currentProduct.PRECIO_UNIDAD,
-      PRECIO_APLICADO: precioPre,
-      DESCUENTO_POR_CANTIDAD: 0,
-      SUBTOTAL_ITEM: precioPre * cantidad,
-      FOTO: currentProduct.FOTO || "",
-    };
-
-    setSessionData((prev) => {
-      const existingIndex = prev.carrito.findIndex(
-        (cartItem) =>
-          cartItem.CODIGO_INTERNO === newItem.CODIGO_INTERNO &&
-          cartItem.TALLA === newItem.TALLA
-      );
-
-      let newCarrito;
-
-      if (existingIndex > -1) {
-        newCarrito = [...prev.carrito];
-        const existingItem = newCarrito[existingIndex];
-        const newCantidad = existingItem.CANTIDAD + newItem.CANTIDAD;
-        const newPricePre = calcularPrecioPreview(currentProduct, newCantidad);
-
-        newCarrito[existingIndex] = {
-          ...existingItem,
-          CANTIDAD: newCantidad,
-          PRECIO_APLICADO: newPricePre,
-          SUBTOTAL_ITEM: newPricePre * newCantidad,
-        };
-      } else {
-        newCarrito = [...prev.carrito, newItem];
-      }
-
-      setToastMessage(
-        `✅ Agregado: ${newItem.DESCRIPCION} (${newItem.TALLA}) x${newItem.CANTIDAD} = $${(
-          newItem.PRECIO_APLICADO * newItem.CANTIDAD
-        ).toFixed(2)}`
-      );
-
-      return {
-        ...prev,
-        carrito: newCarrito,
-        step: "menu_flotante",
-      };
-    });
-
-    setSelectedTalla("");
-    setCantidad(1);
-  };
-
-  // ===================================
-  //            MOSTRAR CARRITO
-  // ===================================
-  const mostrarCarrito = () => {
-    if (sessionData.carrito.length === 0) {
-      addMessage("🛒 Tu carrito está vacío", "bot");
-      setShowCarousel(false);
-      return;
-    }
-
-    setShowCarousel(false);
-
-    let texto = "🛒 *TU CARRITO:*\n\n";
-
-    let subtotal = 0;
-    const metodo = sessionData.metodo_pago || "Contra entrega";
-
-    sessionData.carrito.forEach((item, idx) => {
-      const precio = calcularPrecioItem(item, metodo);
-      const subItem = precio * item.CANTIDAD;
-
-      texto += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
-      texto += `   Cantidad: ${item.CANTIDAD} → $${subItem.toFixed(2)}\n\n`;
-
-      subtotal += subItem;
-    });
-
-    addMessage(texto, "bot");
-  };
-
-  // ===================================
   //            MOSTRAR RESUMEN
   // ===================================
   const mostrarResumen = () => {
@@ -772,6 +857,7 @@ export default function ChatBot() {
     sessionData.carrito.forEach((item, idx) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
+      // Formato corto para el resumen (tipo carrito)
       resumen += `${idx + 1}. ${item.DESCRIPCION} (${item.TALLA})\n`;
       resumen += `   Cantidad: ${item.CANTIDAD} → $${subItem.toFixed(2)}\n\n`;
     });
@@ -780,6 +866,7 @@ export default function ChatBot() {
     resumen += `💵 costo_envio: $${sessionData.costo_envio.toFixed(2)}\n\n`;
     resumen += `💵 *TOTAL: $${total.toFixed(2)}*\n\n`;
 
+    // DETALLES DEL ENVÍO (Nuevo orden solicitado)
     resumen += `*DETALLES DEL ENVÍO:*\n\n`;
 
     let tipoEnvioTexto = sessionData.tipo_entrega;
@@ -865,6 +952,7 @@ export default function ChatBot() {
 
     const total = subtotal + sessionData.costo_envio;
 
+    // Recalcular precios por producto para enviar limpios al backend
     const productos = sessionData.carrito.map((item) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
@@ -982,6 +1070,7 @@ export default function ChatBot() {
     sessionData.carrito.forEach((item, idx) => {
       const precio = calcularPrecioItem(item, metodo);
       const subItem = precio * item.CANTIDAD;
+      // Formato detallado (mini-factura) para WhatsApp
       mensaje += `\nProducto #${idx + 1}\n`;
       mensaje += `Código interno: ${item.CODIGO_INTERNO}\n`;
       mensaje += `Categoría: ${item.CATEGORIA}\n`;
@@ -1003,6 +1092,7 @@ export default function ChatBot() {
     if (tipoTexto === "CASILLERO") tipoTexto = "📦 CASILLERO";
     if (tipoTexto === "RETIRO EN TIENDA") tipoTexto = "🏪 RETIRO EN TIENDA";
 
+    // DETALLES DEL ENVÍO (Nuevo orden solicitado)
     mensaje += `*DETALLES DEL ENVÍO:*\n`;
     mensaje += `🚚 envío: ${tipoTexto}\n`;
     mensaje += `📍 departamento: ${sessionData.departamento}\n`;
@@ -1028,82 +1118,104 @@ export default function ChatBot() {
       mensaje += `⏰ hora_entrega: ${sessionData.hora_entrega}\n`;
     }
 
-    mensaje += `\n💳 método_pago: ${sessionData.metodo_pago}`;
+    mensaje += `💳 método_pago: ${sessionData.metodo_pago}\n\n`;
+    mensaje += `✨ _Pedido desde chatbot automático_`;
 
     const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
       mensaje
-    )}`;
-    window.open(url, "_blank");
+     )}`;
 
-    addMessage(
-      "✅ Se abrió WhatsApp. Envía el mensaje para confirmar tu pedido.",
-      "bot"
-    );
+    addMessage("Abriendo WhatsApp para confirmar tu pedido... 📱", "bot");
+    // Usar window.location.href para máxima compatibilidad en iOS/móviles
+    window.location.href = url;
   };
 
   // ===================================
-  //      PROCESAR MENSAJES / FLUJO
+  //          PROCESAR MENSAJES
   // ===================================
   const processMessage = async (userInput) => {
+    addMessage(userInput, "user");
+    const input = userInput.toLowerCase().trim();
     const session = sessionData;
 
-    // PASO 0: NOMBRE
+    // 1) NOMBRE
     if (session.step === "inicio") {
-      const nombre = userInput.trim();
-      if (nombre.length < 2) {
-        addMessage("⚠️ Por favor ingresa un nombre válido", "bot");
-        return;
+      const partes = userInput.trim().split(/\s+/);
+      if (partes.length >= 2) {
+        setSessionData((prev) => ({
+          ...prev,
+          nombre: userInput.trim(),
+          step: "telefono",
+        }));
+        addMessage(
+          `Gracias ${userInput.trim()} 😊\n\nAhora, ¿cuál es tu número de teléfono?`,
+          "bot"
+        );
+      } else {
+        addMessage(
+          "Por favor, necesito tu nombre completo (nombre y apellido) 😊",
+          "bot"
+        );
       }
-      setSessionData((prev) => ({
-        ...prev,
-        nombre,
-        step: "telefono",
-      }));
-      addMessage("¿Cuál es tu NÚMERO DE TELÉFONO?", "bot");
       return;
     }
 
-    // PASO 1: TELÉFONO
+    // 2) TELÉFONO
     if (session.step === "telefono") {
-      const telefono = userInput.trim();
-      if (telefono.length < 7) {
-        addMessage("⚠️ Por favor ingresa un teléfono válido", "bot");
-        return;
+      const tel = userInput.replace(/[^0-9]/g, "");
+      if (tel.length >= 8) {
+        setSessionData((prev) => ({
+          ...prev,
+          telefono: tel,
+          step: "menu",
+        }));
+        addMessage("Perfecto 📱 ¿Qué deseas hacer?", "bot", [
+          { label: "🛍️ Ver catálogo", value: "catalogo" },
+          { label: "👤 Hablar con agente", value: "agente" },
+        ]);
+      } else {
+        addMessage(
+          "Por favor, ingresa un número de teléfono válido (8 dígitos)",
+          "bot"
+        );
       }
-      setSessionData((prev) => ({
-        ...prev,
-        telefono,
-        step: "menu",
-      }));
-      addMessage(
-        `✅ Hola ${session.nombre}! 👋\n\n¿Qué deseas hacer?`,
-        "bot",
-        [
-          { label: "🛍️ Ver catálogo", value: "ver_catalogo" },
-          { label: "🛒 Ver carrito", value: "ver_carrito" },
-          { label: "➡️ Continuar pedido", value: "continuar_pedido" },
-        ]
-      );
       return;
     }
 
-    // 2) VER CATÁLOGO
-    if (userInput === "ver_catalogo") {
+    // 3) MENÚ PRINCIPAL
+    if (input === "catalogo") {
       setShowCarousel(true);
-      await cargarCatalogo();
+      setCarouselIndex(0);
+      cargarCatalogo(selectedCategory);
+      setSessionData((prev) => ({ ...prev, step: "menu_flotante" })); // Activar barra flotante
       return;
     }
 
-    // 3) VER CARRITO
-    if (userInput === "ver_carrito") {
+    if (input === "agente") {
+      const msg = `Hola, soy ${session.nombre} y necesito ayuda con un pedido`;
+      const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
+        msg
+       )}`;
+      addMessage("Conectándote con un asesor... 👋", "bot");
+      window.location.href = url;
+      return;
+    }
+
+    if (input === "agregar_mas") {
+      setShowCarousel(true);
+      setSessionData((prev) => ({ ...prev, step: "menu_flotante" })); // Asegurar que el FAB esté visible
+      return;
+    }
+
+    if (input === "ver_carrito") {
       mostrarCarrito();
-      setSessionData((prev) => ({ ...prev, step: "menu_flotante" }));
+      setSessionData((prev) => ({ ...prev, step: "menu_flotante" })); // Mantener barra flotante después de ver carrito
       return;
     }
 
-    // 4) CONTINUAR PEDIDO - NUEVO FLUJO CON ENVÍO INTELIGENTE
-    if (userInput === "continuar_pedido") {
-      if (sessionData.carrito.length === 0) {
+    // 4) CONTINUAR PEDIDO
+    if (input === "continuar_pedido") {
+      if (session.carrito.length === 0) {
         addMessage(
           "⚠️ Tu carrito está vacío. Agrega productos primero.",
           "bot"
@@ -1111,204 +1223,56 @@ export default function ChatBot() {
         return;
       }
       setShowCarousel(false);
+      setSessionData((prev) => ({ ...prev, step: "continuar_pedido_flotante" })); // Desactivar FAB
 
-      // Calcular total de productos
-      const totalProductos = sessionData.carrito.reduce(
+      const totalProductos = session.carrito.reduce(
         (sum, item) => sum + item.CANTIDAD,
         0
       );
 
-      // Iniciar flujo de envío inteligente
-      setSessionData((prev) => ({
-        ...prev,
-        step: "seleccionar_departamento",
-      }));
-
-      addMessage(
-        "📍 ¿De qué departamento eres?",
-        "bot",
-        Object.keys(DEPARTAMENTOS_MUNICIPIOS).map((dep) => ({
-          label: dep,
-          value: `dep_${dep}`,
-        }))
-      );
-      return;
-    }
-
-    // 5) SELECCIONAR DEPARTAMENTO
-    if (userInput.startsWith("dep_")) {
-      const departamento = userInput.replace("dep_", "");
-      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
-
-      if (!municipios.length) {
+      if (totalProductos >= 3) {
+        setSessionData((prev) => ({ ...prev, step: "tipo_envio_3mas" }));
         addMessage(
-          `⚠️ No se encontraron municipios para ${departamento}.`,
+          "📦 Tienes 3 o más productos\n\n¿Cómo deseas recibir tu pedido?",
           "bot",
-          [{ label: "📞 Contactar agente", value: "agente" }]
+          [
+            { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
+            { label: "📦 CASILLERO", value: "tipo_casillero" },
+            { label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" },
+          ]
         );
-        return;
+      } else {
+        setSessionData((prev) => ({ ...prev, step: "tipo_envio" }));
+        addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", [
+          { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
+          { label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" },
+          { label: "📦 CASILLERO", value: "tipo_casillero" },
+          { label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" },
+        ]);
       }
-
-      setDepartamentoSeleccionado(departamento);
-      setSessionData((prev) => ({
-        ...prev,
-        departamento,
-        step: "seleccionar_municipio",
-      }));
-
-      addMessage(
-        `${departamento} 📍\n\n¿De qué municipio?`,
-        "bot",
-        municipios.map((muni) => ({
-          label: muni,
-          value: `muni_${muni}`,
-        }))
-      );
       return;
     }
 
-    // 6) SELECCIONAR MUNICIPIO
-    if (userInput.startsWith("muni_")) {
-      const municipio = userInput.replace("muni_", "");
-      setMunicipioSeleccionado(municipio);
-      setSessionData((prev) => ({
-        ...prev,
-        municipio,
-        step: "seleccionar_tipo_envio_filtrado",
-      }));
-
-      // Calcular total de productos para filtrado
-      const totalProductos = sessionData.carrito.reduce(
-        (sum, item) => sum + item.CANTIDAD,
-        0
-      );
-
-      // Cargar encomiendistas para esta ubicación
-      const resultadoPuntoFijo = await cargarEncomiendistas(
-        "PUNTO FIJO",
-        departamentoSeleccionado,
-        municipio
-      );
-      const resultadoCasillero = await cargarEncomiendistas(
-        "CASILLERO",
-        departamentoSeleccionado,
-        municipio
-      );
-
-      // Construir opciones disponibles
-      const opciones = [];
-      opciones.push({
-        label: "🏪 RETIRO EN TIENDA ($0.00)",
-        value: "tipo_retiro_tienda",
-      });
-      opciones.push({
-        label: "🏠 PERSONALIZADO ($3.50)",
-        value: "tipo_personalizado",
-      });
-
-      // Punto Fijo: solo si tiene 1-2 productos Y existe para la ubicación
-      if (totalProductos <= 2 && resultadoPuntoFijo.items.length > 0) {
-        opciones.push({
-          label: "📍 PUNTO FIJO",
-          value: "tipo_punto_fijo",
-        });
-      }
-
-      // Casillero: disponible siempre que exista para la ubicación
-      if (resultadoCasillero.items.length > 0) {
-        opciones.push({
-          label: "📦 CASILLERO",
-          value: "tipo_casillero",
-        });
-      }
-
-      addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", opciones);
-      return;
-    }
-
-    // 7) TIPO DE ENTREGA - PERSONALIZADO
-    if (userInput === "tipo_personalizado") {
+    // 5) TIPO DE ENTREGA
+    if (input === "tipo_personalizado") {
       setSessionData((prev) => ({
         ...prev,
         tipo_entrega: "PERSONALIZADO",
         costo_envio: 3.5,
-        step: "punto_referencia_personalizado",
+        step: "departamento_personalizado",
       }));
       addMessage(
-        `🏠 Envío PERSONALIZADO - $3.50\n\n¿Cuál es tu punto de referencia?\n(Ej: Frente a gasolinera Shell)`,
-        "bot"
-      );
-      return;
-    }
-
-    // 8) PUNTO DE REFERENCIA PERSONALIZADO
-    if (session.step === "punto_referencia_personalizado") {
-      setSessionData((prev) => ({
-        ...prev,
-        punto_referencia: userInput.trim(),
-        direccion: userInput.trim(),
-        encomiendista: "PERSONALIZADO",
-        encomiendista_nombre: "Envío Personalizado",
-        step: "metodo_pago",
-      }));
-
-      const costoEnvio = 3.5;
-      const totalContraEntrega = calcularTotalCarrito(
-        "Contra entrega",
-        session.carrito,
-        costoEnvio
-      );
-      const totalTransferencia = calcularTotalCarrito(
-        "Transferencia",
-        session.carrito,
-        costoEnvio
-      );
-      let incentivoTexto = "";
-      if (totalTransferencia < totalContraEntrega) {
-        incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(
-          2
-        )}. ¡Aprovecha el mejor precio!`;
-      }
-
-      addMessage(
-        `🏠 Punto de referencia registrado\n💵 Costo de envío: $3.50\n\n¿Cómo deseas pagar?${incentivoTexto}`,
+        "🏠 Envío PERSONALIZADO - $3.50\n\n📍 ¿De qué departamento eres?",
         "bot",
-        [
-          { label: "💵 Contra entrega", value: "contra_entrega" },
-          { label: "💳 Transferencia", value: "transferencia" },
-        ]
+        Object.keys(DEPARTAMENTOS_MUNICIPIOS).map((dep) => ({
+          label: dep,
+          value: `dep_pers_${dep}`,
+        }))
       );
       return;
     }
 
-    // 9) TIPO DE ENTREGA - RETIRO EN TIENDA
-    if (userInput === "tipo_retiro_tienda") {
-      setSessionData((prev) => ({
-        ...prev,
-        tipo_entrega: "RETIRO EN TIENDA",
-        costo_envio: 0,
-        departamento: "TIENDA",
-        municipio: "TIENDA",
-        punto_referencia: "RETIRO EN TIENDA",
-        encomiendista: "RETIRO EN TIENDA",
-        encomiendista_nombre: "Retiro en Tienda",
-        dia_entrega: "INMEDIATO",
-        hora_entrega: "HORARIO DE TIENDA",
-        step: "metodo_pago",
-      }));
-      addMessage(
-        "✅ Has seleccionado *RETIRO EN TIENDA*.\n\n🏪 Ubicación: [Tu tienda física]\n⏰ Horario: [Horario de tienda]\n\n¿Cómo deseas pagar?",
-        "bot",
-        [
-          { label: "💵 Contra entrega", value: "contra_entrega" },
-          { label: "💳 Transferencia", value: "transferencia" },
-        ]
-      );
-      return;
-    }
-
-    // 10) TIPO DE ENTREGA - PUNTO FIJO
-    if (userInput === "tipo_punto_fijo") {
+    if (input === "tipo_punto_fijo") {
       setSessionData((prev) => ({
         ...prev,
         tipo_entrega: "PUNTO FIJO",
@@ -1340,8 +1304,63 @@ export default function ChatBot() {
       return;
     }
 
-    // 11) TIPO DE ENTREGA - CASILLERO
-    if (userInput === "tipo_casillero") {
+    if (input === "tipo_retiro_tienda") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "RETIRO EN TIENDA",
+        costo_envio: 0,
+        departamento: "TIENDA",
+        municipio: "TIENDA",
+        punto_referencia: "RETIRO EN TIENDA",
+        encomiendista: "RETIRO EN TIENDA",
+        encomiendista_nombre: "Retiro en Tienda",
+        dia_entrega: "INMEDIATO",
+        hora_entrega: "HORARIO DE TIENDA",
+        step: "metodo_pago",
+      }));
+      addMessage(
+        "✅ Has seleccionado *RETIRO EN TIENDA*.
+
+🏪 Ubicación: [Tu tienda física]
+⏰ Horario: [Horario de tienda]
+
+¿Cómo deseas pagar?",
+        "bot",
+        [
+          { label: "💵 Contra entrega", value: "contra_entrega" },
+          { label: "💳 Transferencia", value: "transferencia" },
+        ]
+      );
+      return;
+    }
+
+    // ANTIGUO CÓDIGO - ELIMINAR ESTO (tipo_retiro_tienda antiguo)
+    if (false && input === "tipo_retiro_tienda_antiguo") {
+      setSessionData((prev) => ({
+        ...prev,
+        tipo_entrega: "RETIRO EN TIENDA",
+        costo_envio: 0,
+        departamento: "TIENDA",
+        municipio: "TIENDA",
+        punto_referencia: "RETIRO EN TIENDA",
+        encomiendista: "RETIRO EN TIENDA",
+        encomiendista_nombre: "Retiro en Tienda",
+        dia_entrega: "INMEDIATO",
+        hora_entrega: "HORARIO DE TIENDA",
+        step: "metodo_pago",
+      }));
+      addMessage(
+        "✅ Has seleccionado *RETIRO EN TIENDA*.\n\n¿Cómo deseas pagar?",
+        "bot",
+        [
+          { label: "💵 Contra entrega", value: "contra_entrega" },
+          { label: "💳 Transferencia", value: "transferencia" },
+        ]
+      );
+      return;
+    }
+
+    if (input === "tipo_casillero") {
       setSessionData((prev) => ({
         ...prev,
         tipo_entrega: "CASILLERO",
@@ -1373,60 +1392,97 @@ export default function ChatBot() {
       return;
     }
 
-    // 12) VOLVER A TIPO DE ENVÍO (desde carrusel)
-    if (userInput === "volver_tipo_envio") {
-      setShowEncomiendaCarousel(false);
+    // 6) PERSONALIZADO: DPTO / MUNICIPIO / REFERENCIA
+    if (input.startsWith("dep_pers_")) {
+      const departamentoInput = input.replace("dep_pers_", "");
+      const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
+        (k) => k.toLowerCase() === departamentoInput.toLowerCase()
+      );
+      const departamento = departamentoKey || departamentoInput;
+      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
+
+      if (!municipios.length) {
+        addMessage(
+          `⚠️ No se encontraron municipios para ${departamentoInput}.`,
+          "bot",
+          [{ label: "📞 Contactar agente", value: "agente" }]
+        );
+        return;
+      }
+
       setSessionData((prev) => ({
         ...prev,
-        step: "seleccionar_tipo_envio_filtrado",
+        departamento,
+        step: "municipio_personalizado",
       }));
-
-      const totalProductos = sessionData.carrito.reduce(
-        (sum, item) => sum + item.CANTIDAD,
-        0
+      addMessage(
+        `${departamento} 📍\n\n¿De qué municipio?`,
+        "bot",
+        municipios.map((muni) => ({
+          label: muni,
+          value: `muni_pers_${muni}`,
+        }))
       );
-
-      const resultadoPuntoFijo = await cargarEncomiendistas(
-        "PUNTO FIJO",
-        departamentoSeleccionado,
-        municipioSeleccionado
-      );
-      const resultadoCasillero = await cargarEncomiendistas(
-        "CASILLERO",
-        departamentoSeleccionado,
-        municipioSeleccionado
-      );
-
-      const opciones = [];
-      opciones.push({
-        label: "🏪 RETIRO EN TIENDA ($0.00)",
-        value: "tipo_retiro_tienda",
-      });
-      opciones.push({
-        label: "🏠 PERSONALIZADO ($3.50)",
-        value: "tipo_personalizado",
-      });
-
-      if (totalProductos <= 2 && resultadoPuntoFijo.items.length > 0) {
-        opciones.push({
-          label: "📍 PUNTO FIJO",
-          value: "tipo_punto_fijo",
-        });
-      }
-
-      if (resultadoCasillero.items.length > 0) {
-        opciones.push({
-          label: "📦 CASILLERO",
-          value: "tipo_casillero",
-        });
-      }
-
-      addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", opciones);
       return;
     }
 
-    // 13) MÉTODO DE PAGO - CONTRA ENTREGA
-    if (userInput === "contra_entrega") {
+    if (input.startsWith("muni_pers_")) {
+      const municipio = input.replace("muni_pers_", "");
+      setSessionData((prev) => ({
+        ...prev,
+        municipio,
+        step: "punto_referencia_personalizado",
+      }));
+      addMessage(
+        `📍 ${session.departamento} - ${municipio}\n\n¿Cuál es tu punto de referencia?\n(Ej: Frente a gasolinera Shell)`,
+        "bot"
+      );
+      return;
+    }
+
+    if (session.step === "punto_referencia_personalizado") {
+      setSessionData((prev) => ({
+        ...prev,
+        punto_referencia: userInput.trim(),
+        direccion: userInput.trim(),
+        encomiendista: "PERSONALIZADO",
+        encomiendista_nombre: "Envío Personalizado",
+        step: "metodo_pago",
+      }));
+
+      // --- INCENTIVO TRANSFERENCIA (3) ---
+      const costoEnvio = 3.5; // Costo fijo para envío personalizado
+      const totalContraEntrega = calcularTotalCarrito(
+        "Contra entrega",
+        session.carrito,
+        costoEnvio
+      );
+      const totalTransferencia = calcularTotalCarrito(
+        "Transferencia",
+        session.carrito,
+        costoEnvio
+      );
+      let incentivoTexto = "";
+      if (totalTransferencia < totalContraEntrega) {
+        incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(
+          2
+        )}. ¡Aprovecha el mejor precio!`;
+      }
+      // -----------------------------------
+
+      addMessage(
+        `🏠 Punto de referencia registrado\n💵 Costo de envío: $3.50\n\n¿Cómo deseas pagar?${incentivoTexto}`,
+        "bot",
+        [
+          { label: "💵 Contra entrega", value: "contra_entrega" },
+          { label: "💳 Transferencia", value: "transferencia" },
+        ]
+      );
+      return;
+    }
+
+    // 7) MÉTODO DE PAGO
+    if (input === "contra_entrega") {
       setSessionData((prev) => ({
         ...prev,
         metodo_pago: "Contra entrega",
@@ -1437,8 +1493,7 @@ export default function ChatBot() {
       return;
     }
 
-    // 14) MÉTODO DE PAGO - TRANSFERENCIA
-    if (userInput === "transferencia") {
+    if (input === "transferencia") {
       setSessionData((prev) => ({
         ...prev,
         metodo_pago: "Transferencia",
@@ -1455,7 +1510,7 @@ export default function ChatBot() {
       return;
     }
 
-    if (userInput === "subir_ahora") {
+    if (input === "subir_ahora") {
       addMessage(
         "Pulsa el botón 📷 de abajo para seleccionar la foto del comprobante.",
         "bot"
@@ -1463,7 +1518,8 @@ export default function ChatBot() {
       return;
     }
 
-    if (userInput === "subir_despues") {
+    if (input === "subir_despues") {
+      // No hay comprobante todavía, pero dejamos continuar
       setSessionData((prev) => ({
         ...prev,
         step: "confirmar",
@@ -1476,25 +1532,17 @@ export default function ChatBot() {
       return;
     }
 
-    // 15) CONFIRMAR / CANCELAR
-    if (userInput === "confirmar_pedido") {
+    // 8) CONFIRMAR / CANCELAR
+    if (input === "confirmar_pedido") {
       await crearPedidoConComprobante();
       return;
     }
 
-    if (userInput === "cancelar") {
+    if (input === "cancelar") {
       addMessage(
         "❌ Pedido cancelado. Si deseas, puedes empezar de nuevo.",
         "bot"
       );
-      return;
-    }
-
-    // 16) AGREGAR MÁS PRODUCTOS
-    if (userInput === "agregar_mas") {
-      setShowCarousel(true);
-      await cargarCatalogo();
-      setSessionData((prev) => ({ ...prev, step: "menu_flotante" }));
       return;
     }
 
@@ -1595,7 +1643,7 @@ export default function ChatBot() {
           </div>
         ))}
 
-        {/* COMPONENTE TOAST */}
+        {/* COMPONENTE TOAST (Notificación Temporal) */}
         {toastMessage && (
           <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
             <div
@@ -1658,14 +1706,14 @@ export default function ChatBot() {
                       currentProduct.FOTO ||
                       currentProduct["FOTO LINK"] ||
                       "https://via.placeholder.com/300";
-                    if (url.includes("drive.google.com/uc?export=view")) {
+                    if (url.includes("drive.google.com/uc?export=view" )) {
                       const id = url.split("id=")[1];
                       if (id) {
                         url = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
                       }
                     }
                     return url;
-                  })()}
+                  } )()}
                   alt={currentProduct.DESCRIPCION}
                   className="w-full h-64 object-cover rounded-lg mb-3"
                   onError={(e) => {
@@ -1695,7 +1743,7 @@ export default function ChatBot() {
                         </label>
                         <select
                           value={selectedTalla}
-                          onChange={(e) => setSelectedTalla(e.target.value)}
+                          onChange={(e ) => setSelectedTalla(e.target.value)}
                           className="w-full px-3 py-2 border rounded-lg"
                         >
                           <option value="">Selecciona talla</option>
@@ -1717,9 +1765,8 @@ export default function ChatBot() {
                       min="1"
                       value={cantidad}
                       onChange={(e) => {
-                        let val = parseInt(e.target.value) || 1;
-                        if (val < 1) val = 1;
-                        setCantidad(val);
+                        const val = e.target.value;
+                        setCantidad(val === "" ? "" : parseInt(val) || 1);
                       }}
                       className="w-full px-3 py-2 border rounded-lg"
                     />
@@ -1787,12 +1834,12 @@ export default function ChatBot() {
                       src={fotoUrl}
                       alt={enc.ENCOMIENDISTA}
                       className="w-full h-48 object-cover rounded-lg mb-3"
-                      onError={(e) => {
+                      onError={(e ) => {
                         e.target.src =
                           "https://via.placeholder.com/300?text=Sin+Foto";
                       }}
                     />
-                  )}
+                   )}
 
                   <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
                     <h4 className="font-bold text-xl text-purple-600">
@@ -1840,13 +1887,6 @@ export default function ChatBot() {
                       <Truck className="w-5 h-5" />
                       Elegir esta opción
                     </button>
-
-                    <button
-                      onClick={() => handleOptionClick("volver_tipo_envio")}
-                      className="w-full bg-gray-300 text-gray-800 py-2 rounded-lg font-semibold hover:bg-gray-400 transition-all"
-                    >
-                      ⬅️ Cambiar tipo de envío
-                    </button>
                   </div>
 
                   <button
@@ -1874,60 +1914,71 @@ export default function ChatBot() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* BARRA DE ACCIONES FLOTANTE */}
+      {/* BARRA DE ACCIONES FLOTANTE (FAB) */}
       {(sessionData.step === "menu_flotante" || sessionData.step === "menu") && (
         <div className="fixed bottom-20 left-0 right-0 z-10">
           <div className="max-w-4xl mx-auto px-4">
             <div className="bg-white p-3 rounded-xl shadow-2xl flex justify-around gap-2 border border-purple-200">
               <button
                 onClick={() => handleOptionClick("agregar_mas")}
-                className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white py-2 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-all text-sm"
+                className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:from-pink-600 hover:to-purple-700 transition-all"
               >
-                🛍️ Agregar más
+                ➕ Agregar más
               </button>
               <button
                 onClick={() => handleOptionClick("ver_carrito")}
-                className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-600 text-white py-2 rounded-lg font-semibold hover:from-blue-600 hover:to-cyan-700 transition-all text-sm"
+                className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-purple-600 transition-all"
               >
-                🛒 Ver carrito
+                🛒 Ver Carrito
               </button>
               <button
                 onClick={() => handleOptionClick("continuar_pedido")}
-                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-2 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all text-sm"
+                className="flex-1 bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-green-600 transition-all"
               >
-                ➡️ Continuar
+                ✅ Continuar
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* BARRA DE INPUT */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-        <div className="max-w-4xl mx-auto flex gap-2">
+      {/* FOOTER INPUT */}
+      <div className="bg-white border-t p-4 shadow-lg">
+        <div className="max-w-4xl mx-auto flex gap-2 items-center">
+          {/* Input de texto */}
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleSend()}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Escribe tu mensaje..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="flex-1 px-4 py-3 border-2 border-purple-200 rounded-full focus:outline-none focus:border-purple-500"
           />
+
+          {/* Input de archivo oculto */}
+          <input
+            id="fileInput"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleFileUpload(e.target.files[0])}
+          />
+
+          {/* Botón cámara */}
+          <label
+            htmlFor="fileInput"
+            className="bg-purple-500 text-white p-3 rounded-full cursor-pointer hover:bg-purple-600 transition-all"
+          >
+            📷
+          </label>
+
+          {/* Botón enviar */}
           <button
             onClick={handleSend}
-            className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all"
+            className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-3 rounded-full hover:from-pink-600 hover:to-purple-700 transition-all"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-6 h-6" />
           </button>
-          <label className="bg-gradient-to-r from-orange-500 to-red-600 text-white px-4 py-2 rounded-lg hover:from-orange-600 hover:to-red-700 transition-all cursor-pointer">
-            📷
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleFileUpload(e.target.files?.[0])}
-              className="hidden"
-            />
-          </label>
         </div>
       </div>
     </div>
