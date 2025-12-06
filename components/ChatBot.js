@@ -14,7 +14,7 @@ import {
 
 // URL de tu Apps Script
 const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxTR62KpdaoUB2S94a7NzY_J1oq7SuEFL1EHSCvShQAt8n3mqOrRbtZgeYrrENHvHJ7/exec";
+  "https://script.google.com/macros/s/AKfycbw7LP5JTdlfg6X5yE5Rr9jzDdT_93WxySpS1tiJ9y9iHzl1ZXgbsxM4vqyt3Di3g_Vr/exec";
 
 // WhatsApp del negocio
 const WHATSAPP_NEGOCIO = "50375936319";
@@ -315,7 +315,7 @@ const DEPARTAMENTOS_MUNICIPIOS = {
 // ======================
 //  COMPONENTE PRINCIPAL
 // ======================
-export default function ChatBot( ) {
+export default function ChatBot() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [catalogo, setCatalogo] = useState([]);
@@ -353,6 +353,10 @@ export default function ChatBot( ) {
   const [selectedTalla, setSelectedTalla] = useState("");
   const [cantidad, setCantidad] = useState(1);
   const [toastMessage, setToastMessage] = useState(null); // Nuevo estado para el Toast
+  
+  // CAMBIO 1: NUEVOS ESTADOS PARA ENVÍO INTELIGENTE
+  const [departamentoSeleccionado, setDepartamentoSeleccionado] = useState("");
+  const [municipioSeleccionado, setMunicipioSeleccionado] = useState("");
 
   const messagesEndRef = useRef(null);
 
@@ -436,6 +440,7 @@ export default function ChatBot( ) {
   // ===================================
   //   CARGAR ENCOMIENDISTAS DESDE SCRIPT
   // ===================================
+  // CAMBIO 2: Modificar función para aceptar departamento y municipio
   const cargarEncomiendistas = async (tipoEnvio, departamento = "", municipio = "") => {
     setLoadingEncomiendas(true);
     try {
@@ -443,10 +448,10 @@ export default function ChatBot( ) {
         tipoEnvio
       )}`;
       if (departamento) {
-        url += `&departamento=${encodeURIComponent(departamento.toUpperCase())}`;
+        url += `&departamento=${encodeURIComponent(departamento)}`;
       }
       if (municipio) {
-        url += `&municipio=${encodeURIComponent(municipio.toUpperCase())}`;
+        url += `&municipio=${encodeURIComponent(municipio)}`;
       }
       const res = await fetch(url);
       const data = await res.json();
@@ -697,9 +702,6 @@ export default function ChatBot( ) {
         step: "menu_flotante", // Nuevo paso para activar la barra flotante
       };
     });
-
-    // Los botones de acción se manejarán con la barra flotante
-    // addMessage("¿Qué deseas hacer?", "bot"); // Mensaje simple para indicar que se esperan acciones (ya no es necesario)
 
     setSelectedTalla("");
     setCantidad(1);
@@ -1119,7 +1121,7 @@ export default function ChatBot( ) {
 
     const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
       mensaje
-     )}`;
+    )}`;
 
     addMessage("Abriendo WhatsApp para confirmar tu pedido... 📱", "bot");
     // Usar window.location.href para máxima compatibilidad en iOS/móviles
@@ -1163,85 +1165,18 @@ export default function ChatBot( ) {
         setSessionData((prev) => ({
           ...prev,
           telefono: tel,
-          step: "departamento",
+          step: "menu",
         }));
-        addMessage(
-          "📍 ¿De qué departamento eres?",
-          "bot",
-          Object.keys(DEPARTAMENTOS_MUNICIPIOS).map((dep) => ({
-            label: dep,
-            value: `dep_${dep}`,
-          }))
-        );
+        addMessage("Perfecto 📱 ¿Qué deseas hacer?", "bot", [
+          { label: "🛍️ Ver catálogo", value: "catalogo" },
+          { label: "👤 Hablar con agente", value: "agente" },
+        ]);
       } else {
         addMessage(
           "Por favor, ingresa un número de teléfono válido (8 dígitos)",
           "bot"
         );
       }
-      return;
-    }
-
-    // 2.1) DEPARTAMENTO
-    if (input.startsWith("dep_")) {
-      const departamento = input.replace("dep_", "");
-      
-      // Buscar la clave correcta en el objeto (puede tener espacios o caracteres especiales)
-      const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
-        key => key.toLowerCase() === departamento.toLowerCase()
-      );
-      
-      if (!departamentoKey) {
-        addMessage(
-          `⚠️ No se encontraron municipios para ${departamento}.`,
-          "bot"
-        );
-        return;
-      }
-      
-      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamentoKey] || [];
-
-      if (!municipios.length) {
-        addMessage(
-          `⚠️ No se encontraron municipios para ${departamento}.`,
-          "bot"
-        );
-        return;
-      }
-
-      setSessionData((prev) => ({
-        ...prev,
-        departamento: departamentoKey,
-        step: "municipio",
-      }));
-
-      addMessage(
-        `${departamentoKey} 📍
-
-¿De qué municipio?`,
-        "bot",
-        municipios.map((muni) => ({
-          label: muni,
-          value: `muni_${muni}`,
-        }))
-      );
-      return;
-    }
-
-    // 2.2) MUNICIPIO
-    if (input.startsWith("muni_")) {
-      const municipio = input.replace("muni_", "");
-
-      setSessionData((prev) => ({
-        ...prev,
-        municipio,
-        step: "menu",
-      }));
-
-      addMessage("Perfecto 📱 ¿Qué deseas hacer?", "bot", [
-        { label: "🛍️ Ver catálogo", value: "catalogo" },
-        { label: "👤 Hablar con agente", value: "agente" },
-      ]);
       return;
     }
 
@@ -1258,7 +1193,7 @@ export default function ChatBot( ) {
       const msg = `Hola, soy ${session.nombre} y necesito ayuda con un pedido`;
       const url = `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(
         msg
-       )}`;
+      )}`;
       addMessage("Conectándote con un asesor... 👋", "bot");
       window.location.href = url;
       return;
@@ -1276,7 +1211,8 @@ export default function ChatBot( ) {
       return;
     }
 
-    // 4) CONTINUAR PEDIDO
+    // CAMBIO 3: NUEVO FLUJO DE CONTINUAR PEDIDO CON ENVÍO INTELIGENTE
+    // 4) CONTINUAR PEDIDO - NUEVO FLUJO CON ENVÍO INTELIGENTE
     if (input === "continuar_pedido") {
       if (session.carrito.length === 0) {
         addMessage(
@@ -1286,63 +1222,233 @@ export default function ChatBot( ) {
         return;
       }
       setShowCarousel(false);
-      setSessionData((prev) => ({ ...prev, step: "continuar_pedido_flotante" })); // Desactivar FAB
+      setSessionData((prev) => ({
+        ...prev,
+        step: "seleccionar_departamento",
+      }));
+
+      addMessage(
+        "📍 ¿De qué departamento eres?",
+        "bot",
+        Object.keys(DEPARTAMENTOS_MUNICIPIOS).map((dep) => ({
+          label: dep,
+          value: `dep_${dep}`,
+        }))
+      );
+      return;
+    }
+
+    // 4.1) SELECCIONAR DEPARTAMENTO
+    if (input.startsWith("dep_")) {
+      const departamento = input.replace("dep_", "");
+      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
+
+      if (!municipios.length) {
+        addMessage(
+          `⚠️ No se encontraron municipios para ${departamento}.`,
+          "bot",
+          [{ label: "📞 Contactar agente", value: "agente" }]
+        );
+        return;
+      }
+
+      setDepartamentoSeleccionado(departamento);
+      setSessionData((prev) => ({
+        ...prev,
+        departamento,
+        step: "seleccionar_municipio",
+      }));
+
+      addMessage(
+        `${departamento} 📍\n\n¿De qué municipio?`,
+        "bot",
+        municipios.map((muni) => ({
+          label: muni,
+          value: `muni_${muni}`,
+        }))
+      );
+      return;
+    }
+
+    // 4.2) SELECCIONAR MUNICIPIO
+    if (input.startsWith("muni_")) {
+      const municipio = input.replace("muni_", "");
+      setMunicipioSeleccionado(municipio);
+      setSessionData((prev) => ({
+        ...prev,
+        municipio,
+        step: "seleccionar_tipo_envio_filtrado",
+      }));
+
+      // Calcular total de productos para filtrado
+      const totalProductos = session.carrito.reduce(
+        (sum, item) => sum + item.CANTIDAD,
+        0
+      );
+
+      // Cargar encomiendistas para esta ubicación
+      const resultadoPuntoFijo = await cargarEncomiendistas(
+        "PUNTO FIJO",
+        departamentoSeleccionado,
+        municipio
+      );
+      const resultadoCasillero = await cargarEncomiendistas(
+        "CASILLERO",
+        departamentoSeleccionado,
+        municipio
+      );
+
+      // Construir opciones disponibles
+      const opciones = [];
+      opciones.push({
+        label: "🏪 RETIRO EN TIENDA ($0.00)",
+        value: "tipo_retiro_tienda",
+      });
+      opciones.push({
+        label: "🏠 PERSONALIZADO ($3.50)",
+        value: "tipo_personalizado",
+      });
+
+      // Punto Fijo: solo si tiene 1-2 productos Y existe para la ubicación
+      if (totalProductos <= 2 && resultadoPuntoFijo.items.length > 0) {
+        opciones.push({
+          label: "📍 PUNTO FIJO",
+          value: "tipo_punto_fijo",
+        });
+      }
+
+      // Casillero: disponible siempre que exista para la ubicación
+      if (resultadoCasillero.items.length > 0) {
+        opciones.push({
+          label: "📦 CASILLERO",
+          value: "tipo_casillero",
+        });
+      }
+
+      addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", opciones);
+      return;
+    }
+
+    // 4.3) VOLVER A TIPO DE ENVÍO (desde carrusel)
+    if (input === "volver_tipo_envio") {
+      setShowEncomiendaCarousel(false);
+      setSessionData((prev) => ({
+        ...prev,
+        step: "seleccionar_tipo_envio_filtrado",
+      }));
 
       const totalProductos = session.carrito.reduce(
         (sum, item) => sum + item.CANTIDAD,
         0
       );
 
-      if (totalProductos >= 3) {
-        setSessionData((prev) => ({ ...prev, step: "tipo_envio_3mas" }));
-        addMessage(
-          "📦 Tienes 3 o más productos\n\n¿Cómo deseas recibir tu pedido?",
-          "bot",
-          [
-            { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
-            { label: "📦 CASILLERO", value: "tipo_casillero" },
-            { label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" },
-          ]
-        );
-      } else {
-        setSessionData((prev) => ({ ...prev, step: "tipo_envio" }));
-        addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", [
-          { label: "🏠 PERSONALIZADO ($3.50)", value: "tipo_personalizado" },
-          { label: "📍 PUNTO FIJO", value: "tipo_punto_fijo" },
-          { label: "📦 CASILLERO", value: "tipo_casillero" },
-          { label: "🏪 RETIRO EN TIENDA ($0.00)", value: "tipo_retiro_tienda" },
-        ]);
+      const resultadoPuntoFijo = await cargarEncomiendistas(
+        "PUNTO FIJO",
+        departamentoSeleccionado,
+        municipioSeleccionado
+      );
+      const resultadoCasillero = await cargarEncomiendistas(
+        "CASILLERO",
+        departamentoSeleccionado,
+        municipioSeleccionado
+      );
+
+      const opciones = [];
+      opciones.push({
+        label: "🏪 RETIRO EN TIENDA ($0.00)",
+        value: "tipo_retiro_tienda",
+      });
+      opciones.push({
+        label: "🏠 PERSONALIZADO ($3.50)",
+        value: "tipo_personalizado",
+      });
+
+      if (totalProductos <= 2 && resultadoPuntoFijo.items.length > 0) {
+        opciones.push({
+          label: "📍 PUNTO FIJO",
+          value: "tipo_punto_fijo",
+        });
       }
+
+      if (resultadoCasillero.items.length > 0) {
+        opciones.push({
+          label: "📦 CASILLERO",
+          value: "tipo_casillero",
+        });
+      }
+
+      addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", opciones);
       return;
     }
 
-    // 5) TIPO DE ENTREGA
+    // CAMBIO 7: TIPO PERSONALIZADO - Ya no pide departamento/municipio
     if (input === "tipo_personalizado") {
       setSessionData((prev) => ({
         ...prev,
         tipo_entrega: "PERSONALIZADO",
         costo_envio: 3.5,
-        step: "departamento_personalizado",
+        step: "punto_referencia_personalizado",
       }));
       addMessage(
-        "🏠 Envío PERSONALIZADO - $3.50\n\n📍 ¿De qué departamento eres?",
-        "bot",
-        Object.keys(DEPARTAMENTOS_MUNICIPIOS).map((dep) => ({
-          label: dep,
-          value: `dep_pers_${dep}`,
-        }))
+        `🏠 Envío PERSONALIZADO - $3.50\n\n¿Cuál es tu punto de referencia?\n(Ej: Frente a gasolinera Shell)`,
+        "bot"
       );
       return;
     }
 
+    // Manejar punto de referencia personalizado
+    if (session.step === "punto_referencia_personalizado") {
+      setSessionData((prev) => ({
+        ...prev,
+        punto_referencia: input.trim(),
+        direccion: input.trim(),
+        encomiendista: "PERSONALIZADO",
+        encomiendista_nombre: "Envío Personalizado",
+        step: "metodo_pago",
+      }));
+
+      const costoEnvio = 3.5;
+      const totalContraEntrega = calcularTotalCarrito(
+        "Contra entrega",
+        session.carrito,
+        costoEnvio
+      );
+      const totalTransferencia = calcularTotalCarrito(
+        "Transferencia",
+        session.carrito,
+        costoEnvio
+      );
+      let incentivoTexto = "";
+      if (totalTransferencia < totalContraEntrega) {
+        incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(
+          2
+        )}. ¡Aprovecha el mejor precio!`;
+      }
+
+      addMessage(
+        `🏠 Punto de referencia registrado\n💵 Costo de envío: $3.50\n\n¿Cómo deseas pagar?${incentivoTexto}`,
+        "bot",
+        [
+          { label: "💵 Contra entrega", value: "contra_entrega" },
+          { label: "💳 Transferencia", value: "transferencia" },
+        ]
+      );
+      return;
+    }
+
+    // CAMBIO 4: TIPO PUNTO FIJO con filtros
     if (input === "tipo_punto_fijo") {
       setSessionData((prev) => ({
         ...prev,
         tipo_entrega: "PUNTO FIJO",
-        step: "cargando_puntos_fijos",
+        step: "carrusel_punto_fijo",
       }));
       addMessage("📍 Buscando puntos fijos disponibles... 🔍", "bot");
-      const resultado = await cargarEncomiendistas("PUNTO FIJO", session.departamento, session.municipio);
+      const resultado = await cargarEncomiendistas(
+        "PUNTO FIJO",
+        departamentoSeleccionado,
+        municipioSeleccionado
+      );
       if (resultado.success && resultado.items.length > 0) {
         setEncomiendaIndex(0);
         setShowEncomiendaCarousel(true);
@@ -1363,6 +1469,7 @@ export default function ChatBot( ) {
       return;
     }
 
+    // CAMBIO 8: TIPO RETIRO EN TIENDA
     if (input === "tipo_retiro_tienda") {
       setSessionData((prev) => ({
         ...prev,
@@ -1378,7 +1485,7 @@ export default function ChatBot( ) {
         step: "metodo_pago",
       }));
       addMessage(
-        "✅ Has seleccionado *RETIRO EN TIENDA*.\n\n¿Cómo deseas pagar?",
+        "✅ Has seleccionado *RETIRO EN TIENDA*.\n\n🏪 Ubicación: [Tu tienda física]\n⏰ Horario: [Horario de tienda]\n\n¿Cómo deseas pagar?",
         "bot",
         [
           { label: "💵 Contra entrega", value: "contra_entrega" },
@@ -1388,14 +1495,19 @@ export default function ChatBot( ) {
       return;
     }
 
+    // CAMBIO 5: TIPO CASILLERO con filtros
     if (input === "tipo_casillero") {
       setSessionData((prev) => ({
         ...prev,
         tipo_entrega: "CASILLERO",
-        step: "cargando_casilleros",
+        step: "carrusel_casillero",
       }));
       addMessage("📦 Buscando casilleros disponibles... 🔍", "bot");
-      const resultado = await cargarEncomiendistas("CASILLERO", session.departamento, session.municipio);
+      const resultado = await cargarEncomiendistas(
+        "CASILLERO",
+        departamentoSeleccionado,
+        municipioSeleccionado
+      );
       if (resultado.success && resultado.items.length > 0) {
         setEncomiendaIndex(0);
         setShowEncomiendaCarousel(true);
@@ -1413,95 +1525,6 @@ export default function ChatBot( ) {
           { label: "📞 Contactar agente", value: "agente" },
         ]);
       }
-      return;
-    }
-
-    // 6) PERSONALIZADO: DPTO / MUNICIPIO / REFERENCIA
-    if (input.startsWith("dep_pers_")) {
-      const departamentoInput = input.replace("dep_pers_", "");
-      const departamentoKey = Object.keys(DEPARTAMENTOS_MUNICIPIOS).find(
-        (k) => k.toLowerCase() === departamentoInput.toLowerCase()
-      );
-      const departamento = departamentoKey || departamentoInput;
-      const municipios = DEPARTAMENTOS_MUNICIPIOS[departamento] || [];
-
-      if (!municipios.length) {
-        addMessage(
-          `⚠️ No se encontraron municipios para ${departamentoInput}.`,
-          "bot",
-          [{ label: "📞 Contactar agente", value: "agente" }]
-        );
-        return;
-      }
-
-      setSessionData((prev) => ({
-        ...prev,
-        departamento,
-        step: "municipio_personalizado",
-      }));
-      addMessage(
-        `${departamento} 📍\n\n¿De qué municipio?`,
-        "bot",
-        municipios.map((muni) => ({
-          label: muni,
-          value: `muni_pers_${muni}`,
-        }))
-      );
-      return;
-    }
-
-    if (input.startsWith("muni_pers_")) {
-      const municipio = input.replace("muni_pers_", "");
-      setSessionData((prev) => ({
-        ...prev,
-        municipio,
-        step: "punto_referencia_personalizado",
-      }));
-      addMessage(
-        `📍 ${session.departamento} - ${municipio}\n\n¿Cuál es tu punto de referencia?\n(Ej: Frente a gasolinera Shell)`,
-        "bot"
-      );
-      return;
-    }
-
-    if (session.step === "punto_referencia_personalizado") {
-      setSessionData((prev) => ({
-        ...prev,
-        punto_referencia: userInput.trim(),
-        direccion: userInput.trim(),
-        encomiendista: "PERSONALIZADO",
-        encomiendista_nombre: "Envío Personalizado",
-        step: "metodo_pago",
-      }));
-
-      // --- INCENTIVO TRANSFERENCIA (3) ---
-      const costoEnvio = 3.5; // Costo fijo para envío personalizado
-      const totalContraEntrega = calcularTotalCarrito(
-        "Contra entrega",
-        session.carrito,
-        costoEnvio
-      );
-      const totalTransferencia = calcularTotalCarrito(
-        "Transferencia",
-        session.carrito,
-        costoEnvio
-      );
-      let incentivoTexto = "";
-      if (totalTransferencia < totalContraEntrega) {
-        incentivoTexto = `\n\n💳 Paga con transferencia y tu total baja a $${totalTransferencia.toFixed(
-          2
-        )}. ¡Aprovecha el mejor precio!`;
-      }
-      // -----------------------------------
-
-      addMessage(
-        `🏠 Punto de referencia registrado\n💵 Costo de envío: $3.50\n\n¿Cómo deseas pagar?${incentivoTexto}`,
-        "bot",
-        [
-          { label: "💵 Contra entrega", value: "contra_entrega" },
-          { label: "💳 Transferencia", value: "transferencia" },
-        ]
-      );
       return;
     }
 
@@ -1730,14 +1753,14 @@ export default function ChatBot( ) {
                       currentProduct.FOTO ||
                       currentProduct["FOTO LINK"] ||
                       "https://via.placeholder.com/300";
-                    if (url.includes("drive.google.com/uc?export=view" )) {
+                    if (url.includes("drive.google.com/uc?export=view")) {
                       const id = url.split("id=")[1];
                       if (id) {
                         url = `https://drive.google.com/thumbnail?id=${id}&sz=w500`;
                       }
                     }
                     return url;
-                  } )()}
+                  })()}
                   alt={currentProduct.DESCRIPCION}
                   className="w-full h-64 object-cover rounded-lg mb-3"
                   onError={(e) => {
@@ -1767,7 +1790,7 @@ export default function ChatBot( ) {
                         </label>
                         <select
                           value={selectedTalla}
-                          onChange={(e ) => setSelectedTalla(e.target.value)}
+                          onChange={(e) => setSelectedTalla(e.target.value)}
                           className="w-full px-3 py-2 border rounded-lg"
                         >
                           <option value="">Selecciona talla</option>
@@ -1858,12 +1881,12 @@ export default function ChatBot( ) {
                       src={fotoUrl}
                       alt={enc.ENCOMIENDISTA}
                       className="w-full h-48 object-cover rounded-lg mb-3"
-                      onError={(e ) => {
+                      onError={(e) => {
                         e.target.src =
                           "https://via.placeholder.com/300?text=Sin+Foto";
                       }}
                     />
-                   )}
+                  )}
 
                   <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
                     <h4 className="font-bold text-xl text-purple-600">
@@ -1910,6 +1933,14 @@ export default function ChatBot( ) {
                     >
                       <Truck className="w-5 h-5" />
                       Elegir esta opción
+                    </button>
+
+                    {/* CAMBIO 6: Botón de retroceso */}
+                    <button
+                      onClick={() => handleOptionClick("volver_tipo_envio")}
+                      className="w-full bg-gray-300 text-gray-800 py-2 rounded-lg font-semibold hover:bg-gray-400 transition-all"
+                    >
+                      ⬅️ Cambiar tipo de envío
                     </button>
                   </div>
 
