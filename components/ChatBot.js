@@ -443,10 +443,10 @@ export default function ChatBot( ) {
         tipoEnvio
       )}`;
       if (departamento) {
-        url += `&departamento=${encodeURIComponent(departamento)}`;
+        url += `&departamento=${encodeURIComponent(departamento.toUpperCase())}`;
       }
       if (municipio) {
-        url += `&municipio=${encodeURIComponent(municipio)}`;
+        url += `&municipio=${encodeURIComponent(municipio.toUpperCase())}`;
       }
       const res = await fetch(url);
       const data = await res.json();
@@ -1216,7 +1216,7 @@ export default function ChatBot( ) {
       }));
 
       addMessage(
-        `${departamento} 📍
+        `${departamentoKey} 📍
 
 ¿De qué municipio?`,
         "bot",
