@@ -1277,63 +1277,69 @@ export default function ChatBot() {
     }
 
     // 4.2) SELECCIONAR MUNICIPIO
-    if (input.startsWith("muni_")) {
-      const municipio = input.replace("muni_", "");
-      setMunicipioSeleccionado(municipio);
-      setSessionData((prev) => ({
-        ...prev,
-        municipio,
-        step: "seleccionar_tipo_envio_filtrado",
-      }));
+if (input.startsWith("muni_")) {
+  const municipio = input.replace("muni_", "");
+  setMunicipioSeleccionado(municipio);
+  setSessionData((prev) => ({
+    ...prev,
+    municipio,
+    step: "seleccionar_tipo_envio_filtrado",
+  }));
 
-      // Calcular total de productos para filtrado
-      const totalProductos = session.carrito.reduce(
-        (sum, item) => sum + item.CANTIDAD,
-        0
-      );
+  // Calcular total de productos para filtrado
+  const totalProductos = session.carrito.reduce(
+    (sum, item) => sum + item.CANTIDAD,
+    0
+  );
 
-      // Cargar encomiendistas para esta ubicación
-      const resultadoPuntoFijo = await cargarEncomiendistas(
-        "PUNTO FIJO",
-        departamentoSeleccionado,
-        municipio
-      );
-      const resultadoCasillero = await cargarEncomiendistas(
-        "CASILLERO",
-        departamentoSeleccionado,
-        municipio
-      );
+  // Mostrar mensaje de carga
+  addMessage("🔍 Buscando opciones de envío disponibles...", "bot");
 
-      // Construir opciones disponibles
-      const opciones = [];
-      opciones.push({
-        label: "🏪 RETIRO EN TIENDA ($0.00)",
-        value: "tipo_retiro_tienda",
-      });
-      opciones.push({
-        label: "🏠 PERSONALIZADO ($3.50)",
-        value: "tipo_personalizado",
-      });
+  // Cargar encomiendistas para esta ubicación
+  const resultadoPuntoFijo = await cargarEncomiendistas(
+    "PUNTO FIJO",
+    departamentoSeleccionado,
+    municipio
+  );
+  const resultadoCasillero = await cargarEncomiendistas(
+    "CASILLERO",
+    departamentoSeleccionado,
+    municipio
+  );
 
-      // Punto Fijo: solo si tiene 1-2 productos Y existe para la ubicación
-      if (totalProductos <= 2 && resultadoPuntoFijo.items.length > 0) {
-        opciones.push({
-          label: "📍 PUNTO FIJO",
-          value: "tipo_punto_fijo",
-        });
-      }
+  console.log("🔍 DEBUG - Punto Fijo encontrados:", resultadoPuntoFijo.items.length);
+  console.log("🔍 DEBUG - Casilleros encontrados:", resultadoCasillero.items.length);
 
-      // Casillero: disponible siempre que exista para la ubicación
-      if (resultadoCasillero.items.length > 0) {
-        opciones.push({
-          label: "📦 CASILLERO",
-          value: "tipo_casillero",
-        });
-      }
+  // Construir opciones disponibles
+  const opciones = [];
+  opciones.push({
+    label: "🏪 RETIRO EN TIENDA ($0.00)",
+    value: "tipo_retiro_tienda",
+  });
+  opciones.push({
+    label: "🏠 PERSONALIZADO ($3.50)",
+    value: "tipo_personalizado",
+  });
 
-      addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", opciones);
-      return;
-    }
+  // Punto Fijo: solo si tiene 1-2 productos Y existe para la ubicación
+  if (totalProductos <= 2 && resultadoPuntoFijo.items.length > 0) {
+    opciones.push({
+      label: "📍 PUNTO FIJO",
+      value: "tipo_punto_fijo",
+    });
+  }
+
+  // Casillero: disponible siempre que exista para la ubicación
+  if (resultadoCasillero.items.length > 0) {
+    opciones.push({
+      label: "📦 CASILLERO",
+      value: "tipo_casillero",
+    });
+  }
+
+  addMessage("📦 ¿Cómo deseas recibir tu pedido?", "bot", opciones);
+  return;
+}
 
     // 4.3) VOLVER A TIPO DE ENVÍO (desde carrusel)
     if (input === "volver_tipo_envio") {
