@@ -1535,28 +1535,27 @@ export default function ChatBot() {
   //         UI RESPONSIVA
   // ===================================
   return (
-  <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 to-purple-50 overflow-hidden">
-    {/* HEADER FIJO - Como WhatsApp */}
-    <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-pink-500 to-purple-600 text-white p-3 sm:p-4 shadow-lg">
-      <div className="max-w-4xl mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <ShoppingBag className="w-6 h-6 sm:w-8 sm:h-8" />
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold">GyS Importadora</h1>
-            <p className="text-xs sm:text-sm opacity-90">Ropa y accesorios 💚</p>
+    <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 to-purple-50 overflow-hidden">
+      {/* HEADER RESPONSIVO */}
+      <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-3 sm:p-4 shadow-lg">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ShoppingBag className="w-6 h-6 sm:w-8 sm:h-8" />
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold">GyS Importadora</h1>
+              <p className="text-xs sm:text-sm opacity-90">Ropa y accesorios 💚</p>
+            </div>
           </div>
+          {sessionData.carrito.length > 0 && (
+            <div className="bg-white/20 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm">
+              🛒 {sessionData.carrito.length}
+            </div>
+          )}
         </div>
-        {sessionData.carrito.length > 0 && (
-          <div className="bg-white/20 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm">
-            🛒 {sessionData.carrito.length}
-          </div>
-        )}
       </div>
-    </div>
 
-    {/* CONTENIDO CON SCROLL - Como WhatsApp */}
-    <div className="flex-1 overflow-y-auto pt-20 sm:pt-24 pb-20 sm:pb-24 px-3 sm:px-4">
-      <div className="space-y-3 sm:space-y-4 max-w-4xl mx-auto w-full">
+      {/* MENSAJES RESPONSIVOS */}
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 max-w-4xl mx-auto w-full pb-24 sm:pb-28">
         {messages.map((msg, idx) => (
           <div
             key={idx}
@@ -1601,7 +1600,7 @@ export default function ChatBot() {
 
         {/* TOAST RESPONSIVO */}
         {toastMessage && (
-          <div className="fixed top-20 sm:top-28 left-1/2 transform -translate-x-1/2 z-50 px-4 w-full max-w-md">
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 w-full max-w-md">
             <div
               className={`bg-white text-gray-800 rounded-xl shadow-2xl p-2 sm:p-3 flex items-center gap-2 border ${
                 toastMessage.includes("⚠️")
@@ -1878,70 +1877,70 @@ export default function ChatBot() {
 
         <div ref={messagesEndRef} />
       </div>
-    </div>
 
-    {/* BARRA FLOTANTE RESPONSIVA */}
-    {(sessionData.step === "menu_flotante" || sessionData.step === "menu") && (
-      <div className="fixed bottom-16 sm:bottom-20 left-0 right-0 z-40">
-        <div className="max-w-4xl mx-auto px-3 sm:px-4">
-          <div className="bg-white p-2 sm:p-3 rounded-xl shadow-2xl flex justify-around gap-1.5 sm:gap-2 border border-purple-200">
-            <button
-              onClick={() => handleOptionClick("agregar_mas")}
-              className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:from-pink-600 hover:to-purple-700 transition-all"
-            >
-              ➕ Agregar
-            </button>
-            <button
-              onClick={() => handleOptionClick("ver_carrito")}
-              className="flex-1 bg-purple-500 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-purple-600 transition-all"
-            >
-              🛒 Carrito
-            </button>
-            <button
-              onClick={() => handleOptionClick("continuar_pedido")}
-              className="flex-1 bg-green-500 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-green-600 transition-all"
-            >
-              ✅ Continuar
-            </button>
+      {/* BARRA FLOTANTE RESPONSIVA */}
+      {(sessionData.step === "menu_flotante" || sessionData.step === "menu") && (
+        <div className="fixed bottom-16 sm:bottom-20 left-0 right-0 z-10">
+          <div className="max-w-4xl mx-auto px-3 sm:px-4">
+            <div className="bg-white p-2 sm:p-3 rounded-xl shadow-2xl flex justify-around gap-1.5 sm:gap-2 border border-purple-200">
+              <button
+                onClick={() => handleOptionClick("agregar_mas")}
+                className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:from-pink-600 hover:to-purple-700 transition-all"
+              >
+                ➕ Agregar
+              </button>
+              <button
+                onClick={() => handleOptionClick("ver_carrito")}
+                className="flex-1 bg-purple-500 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-purple-600 transition-all"
+              >
+                🛒 Carrito
+              </button>
+              <button
+                onClick={() => handleOptionClick("continuar_pedido")}
+                className="flex-1 bg-green-500 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-green-600 transition-all"
+              >
+                ✅ Continuar
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {/* FOOTER FIJO - Como WhatsApp */}
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t p-3 sm:p-4 shadow-lg">
-      <div className="max-w-4xl mx-auto flex gap-1.5 sm:gap-2 items-center">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Escribe tu mensaje..."
-          className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border-2 border-purple-200 rounded-full focus:outline-none focus:border-purple-500 text-xs sm:text-base"
-        />
+      {/* FOOTER RESPONSIVO */}
+      <div className="bg-white border-t p-3 sm:p-4 shadow-lg">
+        <div className="max-w-4xl mx-auto flex gap-1.5 sm:gap-2 items-center">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            placeholder="Escribe tu mensaje..."
+            className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border-2 border-purple-200 rounded-full focus:outline-none focus:border-purple-500 text-xs sm:text-base"
+          />
 
-        <input
-          id="fileInput"
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => handleFileUpload(e.target.files[0])}
-        />
+          <input
+            id="fileInput"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handleFileUpload(e.target.files[0])}
+          />
 
-        <label
-          htmlFor="fileInput"
-          className="bg-purple-500 text-white p-2 sm:p-3 rounded-full cursor-pointer hover:bg-purple-600 transition-all text-sm sm:text-base"
-        >
-          📷
-        </label>
+          <label
+            htmlFor="fileInput"
+            className="bg-purple-500 text-white p-2 sm:p-3 rounded-full cursor-pointer hover:bg-purple-600 transition-all text-sm sm:text-base"
+          >
+            📷
+          </label>
 
-        <button
-          onClick={handleSend}
-          className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-2 sm:p-3 rounded-full hover:from-pink-600 hover:to-purple-700 transition-all"
-        >
-          <Send className="w-4 h-4 sm:w-6 sm:h-6" />
-        </button>
+          <button
+            onClick={handleSend}
+            className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-2 sm:p-3 rounded-full hover:from-pink-600 hover:to-purple-700 transition-all"
+          >
+            <Send className="w-4 h-4 sm:w-6 sm:h-6" />
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+}
