@@ -987,7 +987,7 @@ export default function ChatBot() {
   const enviarWhatsApp = (subtotal, total) => {
     const metodo = sessionData.metodo_pago || "Contra entrega";
 
-    let mensaje = `[GYS_PEDIDO_INICIO]🛍️ *NUEVO PEDIDO - GyS Importadora*\n\n`;
+    let mensaje = `GYSBTA    🛍️ *NUEVO PEDIDO - GyS Importadora*\n\n`;
     mensaje += `👤 *Cliente:* ${sessionData.nombre.toUpperCase()}\n`;
     mensaje += `📱 *Teléfono:* ${sessionData.telefono.toUpperCase()}\n\n`;
 
