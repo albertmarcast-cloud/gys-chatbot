@@ -1671,7 +1671,7 @@ export default function ChatBot() {
                     return url;
                   })()}
                   alt={currentProduct.DESCRIPCION}
-                  className="w-full h-48 sm:h-64 object-cover rounded-lg mb-3"
+                  className="w-full h-72 sm:h-80 object-contain bg-gray-100 rounded-lg mb-3"
                   onError={(e) => {
                     e.target.src =
                       "https://via.placeholder.com/300?text=Sin+Imagen";
@@ -1790,7 +1790,7 @@ export default function ChatBot() {
                     <img
                       src={fotoUrl}
                       alt={enc.ENCOMIENDISTA}
-                      className="w-full h-40 sm:h-48 object-cover rounded-lg mb-3"
+                      className="w-full h-56 sm:h-64 object-contain bg-gray-100 rounded-lg mb-3"
                       onError={(e) => {
                         e.target.src =
                           "https://via.placeholder.com/300?text=Sin+Foto";
