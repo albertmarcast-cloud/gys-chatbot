@@ -17,7 +17,7 @@ const SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbw7LP5JTdlfg6X5yE5Rr9jzDdT_93WxySpS1tiJ9y9iHzl1ZXgbsxM4vqyt3Di3g_Vr/exec";
 
 // WhatsApp del negocio
-const WHATSAPP_NEGOCIO = "50364283314";
+const WHATSAPP_NEGOCIO = "50375279414";
 
 // Departamentos y municipios
 const DEPARTAMENTOS_MUNICIPIOS = {
